@@ -1,17 +1,23 @@
 from .game_objects import Triangle, CircleObstacle
 import asyncio
+import pygame
 
 async def physics_loop(world, dt):
     while True:
         world.update(dt)
         await asyncio.sleep(dt)
 
-def check_collision(object1, object2):
-    # Simple circle collision check based on approximate radius of the triangle
-    if isinstance(object1, Triangle) and isinstance(object2, CircleObstacle):
-        distance_squared = (object1.position[0] - object2.position[0])**2 + (object1.position[1] - object2.position[1])**2
-        radius_sum_squared = (object1.radius + object2.radius)**2
-        return distance_squared < radius_sum_squared
-    elif isinstance(object1, CircleObstacle) and isinstance(object2, Triangle):
-        return check_collision(object2, object1)
+def check_collision(obj1, obj2):
+    if isinstance(obj1, pygame.sprite.Sprite) and isinstance(obj2, pygame.sprite.Sprite):
+        print(f"Prüfe Kollision zwischen: {type(obj1)} und {type(obj2)}")
+        pos1 = pygame.math.Vector2(obj1.rect.center)
+        pos2 = pygame.math.Vector2(obj2.rect.center)
+        distance = pos1.distance_to(pos2)
+
+        radius1 = getattr(obj1, 'radius', obj1.rect.width / 2)
+        radius2 = getattr(obj2, 'radius', obj2.rect.height / 2)
+
+        collided = distance < radius1 + radius2
+        print(f"Abstand: {distance}, Summe Radien: {radius1 + radius2}, Kollision: {collided}")
+        return collided
     return False

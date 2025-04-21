@@ -12,14 +12,16 @@ class GameWorld:
         self.player = None
         self._physics_task = None
         self.is_running = False
-        self.shot_count = 0  # Füge diese Zeile hinzu
+        self.shot_count = 0
+        self.player_collisions = 0  # Neue Variable für Kollisionsanzahl
+        self.max_collisions = 5     # Maximale Anzahl an Kollisionen
 
     def add_object(self, obj):
         self.objects.add(obj)
         if isinstance(obj, Triangle):
             self.player = obj
             if self.player:
-                self.player.game_world = self # Stelle die Rückreferenz her
+                self.player.game_world = self
 
     def remove_object(self, obj):
         self.objects.remove(obj)
@@ -40,18 +42,42 @@ class GameWorld:
         if self.player:
             self.player.rotation_speed = rotation
 
-    def increment_shot_count(self): # Füge diese Methode hinzu
+    def increment_shot_count(self):
         self.shot_count += 1
+
+    def increment_player_collisions(self): # Neue Methode zum Erhöhen der Kollisionsanzahl
+        if self.player_collisions < self.max_collisions:
+            self.player_collisions += 1
 
     def update(self, dt):
         collisions = []
+        collided_with_circle = False  # Reset der Flagge am Anfang des Zyklus
+
         for obj1 in self.objects:
             obj1.update(dt)
             for obj2 in self.objects:
                 if obj1 != obj2 and check_collision(obj1, obj2):
                     if (obj1, obj2) not in collisions and (obj2, obj1) not in collisions:
                         collisions.append((obj1, obj2))
+                        if self.player:
+                            if (obj1 is self.player and isinstance(obj2, CircleObstacle)) or \
+                            (obj2 is self.player and isinstance(obj1, CircleObstacle)):
+                                if not collided_with_circle:
+                                    self.increment_player_collisions()
+                                    collided_with_circle = True
+                                    self.handle_collision(self.player, obj1 if obj2 is self.player else obj2)
+                            elif obj1 is self.player or obj2 is self.player:
+                                pass
         return collisions
+        
+    def handle_collision(self, obj1, obj2):
+    # Einfache Abpralllogik basierend auf der relativen Geschwindigkeit und Normalen
+        normal = pygame.math.Vector2(obj2.rect.center) - pygame.math.Vector2(obj1.rect.center)
+        if normal.length_squared() > 0:
+            normal = normal.normalize()
+            relative_velocity = pygame.math.Vector2(obj1.velocity)
+            impulse = -2 * relative_velocity.dot(normal) * normal
+            obj1.velocity += impulse * 0.5  # Dämpfungsfaktor für den Abprall
 
     async def _run_physics_loop(self, dt):
         while self.is_running:
@@ -76,5 +102,6 @@ class GameWorld:
     def to_dict(self):
         return {
             "objects": [obj.to_dict() for obj in self.objects],
-            "shot_count": self.shot_count # Füge die Schusszahl zum Dictionary hinzu
+            "shot_count": self.shot_count,
+            "player_collisions": self.player_collisions # Sende die Kollisionsanzahl
         }

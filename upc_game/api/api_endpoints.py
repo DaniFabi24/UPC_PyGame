@@ -66,8 +66,8 @@ async def get_world_state():
                 objects_data.append({"type": "triangle", "position": list(obj.position), "angle": obj.angle})
             elif isinstance(obj, CircleObstacle):
                 objects_data.append({"type": "circle", "position": list(obj.position), "radius": obj.radius})
-        print("WORLD STATE:", {"objects": objects_data, "shot_count": game_world.shot_count if hasattr(game_world, 'shot_count') else 0}) # Füge shot_count hinzu
-        return {"objects": objects_data, "shot_count": game_world.shot_count if hasattr(game_world, 'shot_count') else 0} # Füge shot_count hinzu
+        print("WORLD STATE:", {"objects": objects_data, "shot_count": game_world.shot_count if hasattr(game_world, 'shot_count') else 0, "player_collisions": game_world.player_collisions})
+        return {"objects": objects_data, "shot_count": game_world.shot_count if hasattr(game_world, 'shot_count') else 0, "player_collisions": game_world.player_collisions}
     raise HTTPException(status_code=503, detail="Game world not initialized")
 
 app.include_router(router)

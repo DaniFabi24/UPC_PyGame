@@ -40,7 +40,14 @@ def run_visualizer():
     COLLISION_RECT_HEIGHT = 50
     COLLISION_RECT_X = SCREEN_WIDTH - COLLISION_RECT_WIDTH - 10
     COLLISION_RECT_Y = 10
-    shot_count = 0 # Entferne die lokale shot_count-Variable
+    shot_count = 0
+    space_bar_pressed = False
+    player_collisions = 0  # Hier initialisiert
+    max_health = 5
+    health_bar_width = 200
+    health_bar_height = 20
+    health_bar_x = (SCREEN_WIDTH - health_bar_width) // 2
+    health_bar_y = 10
 
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -48,9 +55,20 @@ def run_visualizer():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_c:
-                collided = True
-                collision_timer = COLLISION_DURATION
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_c:
+                    collided = True
+                    collision_timer = COLLISION_DURATION
+                elif event.key == pygame.K_SPACE and not space_bar_pressed:
+                    try:
+                        requests.post(f"{API_BASE_URL}/shoot")
+                        print("Shot fired (Client)!")
+                        space_bar_pressed = True
+                    except requests.exceptions.RequestException as e:
+                        print(f"Error sending shoot command: {e}")
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_SPACE:
+                    space_bar_pressed = False
 
         # Control via keyboard input and API calls
         thrust = 0
@@ -64,12 +82,6 @@ def run_visualizer():
             rotation = -2
         if keys[pygame.K_RIGHT]:
             rotation = 2
-        if keys[pygame.K_SPACE]:
-            try:
-                requests.post(f"{API_BASE_URL}/shoot")
-                print("Shot fired (Client)!")
-            except requests.exceptions.RequestException as e:
-                print(f"Error sending shoot command: {e}")
 
         try:
             requests.post(f"{API_BASE_URL}/move", json={"thrust": thrust, "rotation": rotation})
@@ -83,9 +95,10 @@ def run_visualizer():
         if world_data:
             if "objects" in world_data:
                 objects = world_data["objects"]
-                # Zeichnen der Objekte bleibt gleich
             if "shot_count" in world_data:
-                shot_count = world_data["shot_count"] # Aktualisiere die Schusszahl vom Server
+                shot_count = world_data["shot_count"]
+            if "player_collisions" in world_data:
+                player_collisions = world_data["player_collisions"] # HIER WIRD DER WERT VOM SERVER AKTUALISIERT
             if "collided" in world_data and world_data["collided"]:
                 collided = True
                 collision_timer = COLLISION_DURATION
@@ -97,7 +110,7 @@ def run_visualizer():
                 if obj_data["type"] == "triangle":
                     pos = obj_data["position"]
                     angle = obj_data["angle"]
-                    radius = obj_data.get("radius", 15) # Sichere Zugriff auf Radius
+                    radius = obj_data.get("radius", 15)
                     p1 = (pos[0] + radius * math.cos(math.radians(angle)), pos[1] - radius * math.sin(math.radians(angle)))
                     p2 = (pos[0] + radius * math.cos(math.radians(angle + 120)), pos[1] - radius * math.sin(math.radians(angle + 120)))
                     p3 = (pos[0] + radius * math.cos(math.radians(angle + 240)), pos[1] - radius * math.sin(math.radians(angle + 240)))
@@ -107,15 +120,38 @@ def run_visualizer():
                     radius = obj_data["radius"]
                     pygame.draw.circle(screen, (128, 128, 128), (int(pos[0]), int(pos[1])), int(radius))
 
-        # Anzeigen zeichnen (Schuss, Schub, Rotation)
-        shot_text = font.render(f"Shots: {shot_count}", True, (255, 255, 255))
+        # Anzeigen zeichnen (Schub, Rotation oben links)
         thrust_text = font.render(f"Thrust: {current_thrust}", True, (255, 255, 255))
         rotation_text = font.render(f"Rotation: {current_rotation}", True, (255, 255, 255))
-        screen.blit(shot_text, (10, 10))
-        screen.blit(thrust_text, (10, 40))
-        screen.blit(rotation_text, (10, 70))
+        screen.blit(thrust_text, (10, 10))
+        screen.blit(rotation_text, (10, 40))
 
-        # Kollisionsanzeige
+        # Lebensanzeige (oben mittig)
+        health_percentage = max(0, (max_health - player_collisions) / max_health)
+        health_bar_fill_width = int(health_bar_width * health_percentage)
+        health_bar_rect = pygame.Rect(health_bar_x, health_bar_y, health_bar_width, health_bar_height)
+        health_fill_rect = pygame.Rect(health_bar_x, health_bar_y, health_bar_fill_width, health_bar_height)
+        health_bar_color = (0, 255, 0)
+
+        if health_percentage <= 0.4:
+            health_bar_color = (255, 0, 0)
+        elif health_percentage <= 0.7:
+            health_bar_color = (255, 255, 0)
+
+        pygame.draw.rect(screen, (50, 50, 50), health_bar_rect)
+        pygame.draw.rect(screen, health_bar_color, health_fill_rect)
+
+        # Kollisionszähler als Zahl (oben rechts)
+        collision_counter_text = font.render(f"Collisions: {player_collisions}", True, (255, 255, 255))
+        collision_counter_rect = collision_counter_text.get_rect(topright=(SCREEN_WIDTH - 10, 10))
+        screen.blit(collision_counter_text, collision_counter_rect)
+
+        # Schusszähler unten mittig
+        shot_text = font.render(f"Shots: {shot_count}", True, (255, 255, 255))
+        text_rect = shot_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30))
+        screen.blit(shot_text, text_rect)
+
+        # Kollisionsanzeige (rotes Rechteck)
         if collided:
             pygame.draw.rect(screen, (255, 0, 0), (COLLISION_RECT_X, COLLISION_RECT_Y, COLLISION_RECT_WIDTH, COLLISION_RECT_HEIGHT))
             collision_timer -= dt
