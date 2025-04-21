@@ -2,7 +2,7 @@ import pygame
 import math
 
 class Triangle(pygame.sprite.Sprite):
-    def __init__(self, position, angle=0, color=(0, 128, 255)):
+    def __init__(self, position, angle=0, color=(0, 128, 255), game_world=None):
         super().__init__()
         self.position = list(position)
         self.angle = angle  # Angle in degrees
@@ -14,6 +14,15 @@ class Triangle(pygame.sprite.Sprite):
         self.velocity = [0.0, 0.0] # [vx, vy]
         self.angular_velocity = 0.0 # Angular velocity (degrees/second)
         self.radius = 15  # Approximate radius for collisions
+        self.game_world = game_world
+        # Erstelle ein Pygame Surface für das Dreieck
+        self.image = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
+        pygame.draw.polygon(self.image, self.color, [
+            (self.radius * math.cos(math.radians(0)), -self.radius * math.sin(math.radians(0))),
+            (self.radius * math.cos(math.radians(120)), -self.radius * math.sin(math.radians(120))),
+            (self.radius * math.cos(math.radians(240)), -self.radius * math.sin(math.radians(240)))
+        ])
+        self.rect = self.image.get_rect(center=self.position)
 
     def apply_force(self, force):
         acceleration_x = force[0] / self.mass
@@ -51,15 +60,20 @@ class Triangle(pygame.sprite.Sprite):
         # Limit angle to 0-360 degrees (optional)
         self.angle %= 360
 
+        self.rect.center = [int(self.position[0]), int(self.position[1])] # Aktualisiere die Rect-Position
+
     def draw(self, surface):
-        # Calculate the vertices of the triangle
-        p1 = (self.position[0] + self.radius * math.cos(math.radians(self.angle)),
-              self.position[1] - self.radius * math.sin(math.radians(self.angle)))
-        p2 = (self.position[0] + self.radius * math.cos(math.radians(self.angle + 120)),
-              self.position[1] - self.radius * math.sin(math.radians(self.angle + 120)))
-        p3 = (self.position[0] + self.radius * math.cos(math.radians(self.angle + 240)),
-              self.position[1] - self.radius * math.sin(math.radians(self.angle + 240)))
-        pygame.draw.polygon(surface, self.color, [p1, p2, p3])
+        rotated_image = pygame.transform.rotate(self.image, -self.angle)
+        rotated_rect = rotated_image.get_rect(center=self.rect.center)
+        surface.blit(rotated_image, rotated_rect)
+
+    def to_dict(self):
+        return {
+            "type": "triangle",
+            "position": self.position,
+            "angle": self.angle,
+            "radius": self.radius
+        }
 
 class CircleObstacle(pygame.sprite.Sprite):
     def __init__(self, position, radius, color=(128, 128, 128)):
@@ -67,6 +81,16 @@ class CircleObstacle(pygame.sprite.Sprite):
         self.position = list(position)
         self.radius = radius
         self.color = color
+        self.image = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
+        pygame.draw.circle(self.image, self.color, (self.radius, self.radius), self.radius)
+        self.rect = self.image.get_rect(center=self.position)
 
     def draw(self, surface):
-        pygame.draw.circle(surface, self.color, (int(self.position[0]), int(self.position[1])), self.radius)
+        surface.blit(self.image, self.rect)
+
+    def to_dict(self):
+        return {
+            "type": "circle",
+            "position": self.position,
+            "radius": self.radius
+        }

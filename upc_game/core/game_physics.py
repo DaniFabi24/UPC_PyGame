@@ -1,3 +1,4 @@
+from .game_objects import Triangle, CircleObstacle
 import asyncio
 
 async def physics_loop(world, dt):

@@ -1,31 +1,18 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from pydantic import BaseModel
 import asyncio
 
 game_world = None
-game_world_imported = False
-game_world_import_error = None
-game_world_initialized = False
-
-game_objects_imported = False
-game_objects_import_error = None
 
 try:
-    from UPC_GAME.core.game_world import GameWorld
-    game_world_imported = True
+    from core.game_world import GameWorld
+    from core.game_objects import Triangle, CircleObstacle
     game_world = GameWorld(800, 600)
     game_world.initialize_world()
-    game_world_initialized = True
+    game_world.start_physics_engine()
 except ImportError as e:
-    game_world_imported = False
-    game_world_import_error = str(e)
-
-try:
-    from UPC_GAME.core.game_objects import Triangle, CircleObstacle
-    game_objects_imported = True
-except ImportError as e:
-    game_objects_imported = False
-    game_objects_import_error = str(e)
+    print(f"ImportError: {e}")
+    # Hier könntest du eine entsprechende Fehlerbehandlung implementieren
 
 app = FastAPI()
 router = APIRouter()
@@ -35,21 +22,15 @@ class MoveCommand(BaseModel):
     rotation: float = 0
 
 class ShootCommand(BaseModel):
-    pass # No parameters for shooting in this simple version
+    pass
 
 @router.get("/import_status")
 async def check_imports():
     status = {
-        "game_world_imported": game_world_imported,
-        "game_objects_imported": game_objects_imported,
-        "game_world_initialized": game_world_initialized,
+        "game_world_initialized": game_world is not None,
     }
-    if not game_world_imported:
-        status["game_world_import_error"] = game_world_import_error
-    if not game_objects_imported:
-        status["game_objects_import_error"] = game_objects_import_error
-    if game_world_imported and game_world_initialized:
-        status["world_object_count"] = len(game_world.objects) if hasattr(game_world, 'objects') else 0
+    if game_world:
+        status["world_object_count"] = len(game_world.objects)
     return status
 
 @router.post("/move")
@@ -58,13 +39,14 @@ async def move_player(command: MoveCommand):
         game_world.set_player_thrust(command.thrust)
         game_world.set_player_rotation(command.rotation)
         return {"status": "moving", "thrust": command.thrust, "rotation": command.rotation}
-    return {"status": "error", "message": "Game world not initialized"}
+    raise HTTPException(status_code=503, detail="Game world not initialized")
 
 @router.post("/shoot")
 async def shoot():
     if game_world and game_world.player:
-        return {"status": "shot"} # Implement shooting logic later
-    return {"status": "error", "message": "Player not found or game world not initialized"}
+        game_world.increment_shot_count() # Stelle sicher, dass du die Schusszählung beibehalten willst
+        return {"status": "shot"}
+    raise HTTPException(status_code=503, detail="Player not found or game world not initialized")
 
 @router.get("/player_status")
 async def get_player_status():
@@ -73,7 +55,7 @@ async def get_player_status():
             "position": game_world.player.position,
             "angle": game_world.player.angle
         }
-    return {"status": "error", "message": "Player not found or game world not initialized"}
+    raise HTTPException(status_code=503, detail="Player not found or game world not initialized")
 
 @router.get("/world_state")
 async def get_world_state():
@@ -81,11 +63,11 @@ async def get_world_state():
         objects_data = []
         for obj in game_world.objects:
             if isinstance(obj, Triangle):
-                objects_data.append({"type": "triangle", "position": obj.position, "angle": obj.angle})
+                objects_data.append({"type": "triangle", "position": list(obj.position), "angle": obj.angle})
             elif isinstance(obj, CircleObstacle):
-                objects_data.append({"type": "circle", "position": obj.position, "radius": obj.radius})
-        print("WORLD STATE:", {"objects": objects_data})
-        return {"objects": objects_data}
-    return {"status": "error", "message": "Game world not initialized"}
+                objects_data.append({"type": "circle", "position": list(obj.position), "radius": obj.radius})
+        print("WORLD STATE:", {"objects": objects_data, "shot_count": game_world.shot_count if hasattr(game_world, 'shot_count') else 0}) # Füge shot_count hinzu
+        return {"objects": objects_data, "shot_count": game_world.shot_count if hasattr(game_world, 'shot_count') else 0} # Füge shot_count hinzu
+    raise HTTPException(status_code=503, detail="Game world not initialized")
 
 app.include_router(router)
