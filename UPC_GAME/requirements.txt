@@ -1,0 +1,14 @@
+# The following packages are required for the game:
+
+fastapi         # For building the API (external library)
+uvicorn         # ASGI server to run the FastAPI application (external library)
+pygame          # For 2D graphics and visualization (external library)
+pymunk          # For the 2D physics engine (external library)
+
+asyncio         # For asynchronous programming (Python standard library)
+math            # For mathematical operations (Python standard library)
+time            # For time-related functions (Python standard library)
+subprocess      # For running external commands (Python standard library)
+requests        # For making HTTP requests (external library - though often included)
+
+# End of package list
