@@ -6,9 +6,9 @@ pygame          # For 2D graphics and visualization (external library)
 pymunk          # For the 2D physics engine (external library)
 
 asyncio         # For asynchronous programming (Python standard library)
-math            # For mathematical operations (Python standard library)
-time            # For time-related functions (Python standard library)
-subprocess      # For running external commands (Python standard library)
+#math            # For mathematical operations (Python standard library)
+#time            # For time-related functions (Python standard library)
+#subprocess      # For running external commands (Python standard library)
 requests        # For making HTTP requests (external library - though often included)
 
 # End of package list
