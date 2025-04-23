@@ -1,8 +1,8 @@
-# /home/Daniel/UPC_PyGame/upc_game/core/game_world.py
 import asyncio
 import pygame
 from .game_physics import check_collision, physics_loop
 from .game_objects import Triangle, CircleObstacle
+import time
 
 class GameWorld:
     def __init__(self, width, height):
@@ -13,8 +13,10 @@ class GameWorld:
         self._physics_task = None
         self.is_running = False
         self.shot_count = 0
-        self.player_collisions = 0  # Neue Variable für Kollisionsanzahl
-        self.max_collisions = 5     # Maximale Anzahl an Kollisionen
+        self.player_collisions = 0
+        self.max_collisions = 5
+        self.last_collision_time = 0.0  # Zeitpunkt der letzten Kollision
+        self.collision_cooldown = 0.5  # Totzeit in Sekunden
 
     def add_object(self, obj):
         self.objects.add(obj)
@@ -45,13 +47,46 @@ class GameWorld:
     def increment_shot_count(self):
         self.shot_count += 1
 
-    def increment_player_collisions(self): # Neue Methode zum Erhöhen der Kollisionsanzahl
+    def increment_player_collisions(self):
         if self.player_collisions < self.max_collisions:
             self.player_collisions += 1
 
+    def handle_collision(self, obj1, obj2):
+        normal = pygame.math.Vector2(obj2.rect.center) - pygame.math.Vector2(obj1.rect.center)
+        if normal.length_squared() > 0:
+            normal = normal.normalize()
+            relative_velocity = pygame.math.Vector2(obj1.velocity)
+            impulse = -2 * relative_velocity.dot(normal) * normal
+            obj1.velocity += impulse * 1.5  # Erhöhter Faktor für stärkeren Abprall
+            self.last_collision_time = time.time() # Zeitpunkt der Kollision speichern
+
     def update(self, dt):
         collisions = []
-        collided_with_circle = False  # Reset der Flagge am Anfang des Zyklus
+        collided_with_circle = False
+        player_collided_with_border = False # Flagge für Kollision mit der Grenze
+
+        if self.player:
+            # Überprüfe Kollision mit den Bildschirmgrenzen
+            if self.player.position[0] < 0 or self.player.position[0] > self.width or \
+               self.player.position[1] < 0 or self.player.position[1] > self.height:
+                current_time = time.time()
+                if current_time - self.last_collision_time > self.collision_cooldown:
+                    self.increment_player_collisions()
+                    self.last_collision_time = current_time
+                    player_collided_with_border = True
+                    # Einfaches Zurücksetzen innerhalb der Grenzen mit optionalem Abprall
+                    if self.player.position[0] < 0:
+                        self.player.position[0] = 0
+                        self.player.velocity[0] *= -0.5
+                    elif self.player.position[0] > self.width:
+                        self.player.position[0] = self.width
+                        self.player.velocity[0] *= -0.5
+                    if self.player.position[1] < 0:
+                        self.player.position[1] = 0
+                        self.player.velocity[1] *= -0.5
+                    elif self.player.position[1] > self.height:
+                        self.player.position[1] = self.height
+                        self.player.velocity[1] *= -0.5
 
         for obj1 in self.objects:
             obj1.update(dt)
@@ -61,24 +96,15 @@ class GameWorld:
                         collisions.append((obj1, obj2))
                         if self.player:
                             if (obj1 is self.player and isinstance(obj2, CircleObstacle)) or \
-                            (obj2 is self.player and isinstance(obj1, CircleObstacle)):
-                                if not collided_with_circle:
+                               (obj2 is self.player and isinstance(obj1, CircleObstacle)):
+                                current_time = time.time()
+                                if current_time - self.last_collision_time > self.collision_cooldown:
                                     self.increment_player_collisions()
-                                    collided_with_circle = True
                                     self.handle_collision(self.player, obj1 if obj2 is self.player else obj2)
+                                    collided_with_circle = True
                             elif obj1 is self.player or obj2 is self.player:
                                 pass
         return collisions
-        
-    def handle_collision(self, obj1, obj2):
-    # Einfache Abpralllogik basierend auf der relativen Geschwindigkeit und Normalen
-        normal = pygame.math.Vector2(obj2.rect.center) - pygame.math.Vector2(obj1.rect.center)
-        if normal.length_squared() > 0:
-            normal = normal.normalize()
-            relative_velocity = pygame.math.Vector2(obj1.velocity)
-            impulse = -2 * relative_velocity.dot(normal) * normal
-            obj1.velocity += impulse * 0.5  # Dämpfungsfaktor für den Abprall
-
     async def _run_physics_loop(self, dt):
         while self.is_running:
             self.update(dt)
@@ -103,5 +129,5 @@ class GameWorld:
         return {
             "objects": [obj.to_dict() for obj in self.objects],
             "shot_count": self.shot_count,
-            "player_collisions": self.player_collisions # Sende die Kollisionsanzahl
+            "player_collisions": self.player_collisions
         }

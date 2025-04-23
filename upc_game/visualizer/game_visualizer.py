@@ -77,11 +77,11 @@ def run_visualizer():
         if keys[pygame.K_UP]:
             thrust = 50
         if keys[pygame.K_DOWN]:
-            thrust = -20
+            thrust = -50
         if keys[pygame.K_LEFT]:
-            rotation = -2
+            rotation = -10
         if keys[pygame.K_RIGHT]:
-            rotation = 2
+            rotation = 10
 
         try:
             requests.post(f"{API_BASE_URL}/move", json={"thrust": thrust, "rotation": rotation})

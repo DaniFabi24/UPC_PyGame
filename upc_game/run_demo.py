@@ -10,8 +10,8 @@ import subprocess
 import time
 
 # Start the FastAPI application
-#api_process = subprocess.Popen(["uvicorn", "api.api_endpoints:app", "--reload"])
-#time.sleep(10) # Give the server some time to start
+api_process = subprocess.Popen(["uvicorn", "api.api_endpoints:app", "--reload"])
+time.sleep(10) # Give the server some time to start
 
 # Start the Pygame visualizer
 visualizer_process = subprocess.Popen(["python", "visualizer/game_visualizer.py"])
