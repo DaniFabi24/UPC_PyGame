@@ -1,0 +1,12 @@
+UPC_GAME/
+├── core/
+│   ├── game_physics.py    # Asynchronous physics engine
+│   ├── game_objects.py    # Definition of game objects (with physics properties)
+│   ├── game_world.py      # Management of the game world and starting the physics
+│   └── game_utils.py      # Utility functions (currently empty)
+├── api/
+│   └── api_endpoints.py   # FastAPI application for the API
+├── agent/
+│   └── dummy_agent.py     # Simple dummy agent (optional for Phase 1)
+├── run_demo.py            # Script to run the demo
+├── requirements.txt       # List of required Python packages
