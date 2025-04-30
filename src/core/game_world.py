@@ -174,3 +174,5 @@ class GameWorld:
 # Erstelle globale Instanz nach Initialisierung:
 game_world_instance = GameWorld(SCREEN_WIDTH, SCREEN_HEIGHT)
 game_world_instance.initialize_world()
+
+#Dummy zum Testen von git!
