@@ -17,11 +17,25 @@ class GameWorld:
         self.player_collisions = 0
         self._physics_task = None
         self.is_running = False
+        self.add_borders()
         
     def add_object(self, obj):
         self.objects.append(obj)
         if isinstance(obj, Triangle):
             self.player = obj
+
+    def add_borders(self):
+        static_body = self.space.static_body
+        borders = [
+            pymunk.Segment(static_body, (0, 0), (self.width, 0), 1),            # Unterer Rand
+            pymunk.Segment(static_body, (0, self.height), (self.width, self.height), 1),  # Oberer Rand
+            pymunk.Segment(static_body, (0, 0), (0, self.height), 1),             # Linker Rand
+            pymunk.Segment(static_body, (self.width, 0), (self.width, self.height), 1)      # Rechter Rand
+        ]
+        for border in borders:
+            border.elasticity = 0.5  # perfekte Abprallwirkung
+            border.friction = 0.0
+            self.space.add(border)
 
     def initialize_world(self):
         self.player = Triangle([self.width / 2, self.height / 2], game_world=self)
