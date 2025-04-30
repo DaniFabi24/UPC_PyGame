@@ -1,7 +1,7 @@
 import threading
 import time
 import uvicorn
-from upc_game.settings import API_HOST, API_PORT
+from src.settings import API_HOST, API_PORT
 
 def run_api_server():
     # Starte den API-Server – Dieser nutzt die Startup Events (Physik-Engine wird dort gestartet).
@@ -16,5 +16,5 @@ if __name__ == "__main__":
     time.sleep(5)
     
     # Importiere die globale game_world_instance und starte den Visualizer im Hauptthread
-    from upc_game.core.game_world import game_world_instance
+    from src.core.game_world import game_world_instance
     game_world_instance.run_visualizer()

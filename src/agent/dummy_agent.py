@@ -2,7 +2,7 @@ import sys
 import os
 import time
 import requests
-from upc_game.settings import API_URL
+from ..settings import API_URL
 import pygame
 
 def client_loop():

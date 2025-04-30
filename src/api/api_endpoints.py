@@ -2,8 +2,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-from upc_game.core.game_world import game_world_instance
-from upc_game.settings import PHYSICS_DT
+from src.core.game_world import game_world_instance
+from ..settings import PHYSICS_DT
 
 app = FastAPI()
 

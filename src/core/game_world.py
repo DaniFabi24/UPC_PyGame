@@ -2,8 +2,8 @@ import pymunk
 import pygame
 import threading
 import asyncio
-from upc_game.core.game_objects import *
-from upc_game.settings import *
+from .game_objects import *
+from ..settings import *
 
 class GameWorld:
     def __init__(self, width, height):
