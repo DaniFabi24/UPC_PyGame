@@ -60,11 +60,11 @@ class GameWorld:
 
     def right_player_rotation(self):
         if self.player:
-            self.player.body.angle -= PLAYER_ROTATION
+            self.player.body.angle += PLAYER_ROTATION
 
     def left_player_rotation(self):
         if self.player:
-            self.player.body.angle += PLAYER_ROTATION
+            self.player.body.angle -= PLAYER_ROTATION
 
 
     def increment_shot_count(self):
@@ -136,35 +136,38 @@ class GameWorld:
         background.fill((0, 0, 0))
         # Zeichne statische Objekte (nicht den Spieler) einmalig:
         state = self.to_dict()
-        for obj in state["objects"]:
-            typ = obj["type"]
+        for obj_data in state["objects"]: # Renamed 'obj' to 'obj_data' to avoid conflict
+            typ = obj_data["type"]
             # Angenommen, der Spieler hat den Typ "triangle"
             if typ != "triangle":
-                pos = obj["position"]
+                pos = obj_data["position"]
                 if typ in ("circleobstacle", "circle"):
                     color = (128, 128, 128)
-                    radius = int(obj.get("radius", 15))
+                    radius = int(obj_data.get("radius", 15))
                     pygame.draw.circle(background, color, (int(pos[0]), int(pos[1])), radius)
                 # Hier können weitere statische Objekttypen ergänzt werden.
 
         running = True
         while running:
-            dt = clock.tick(FPS) / 1000.0
+            # dt = clock.tick(FPS) / 1000.0 # dt wird im Visualizer nicht benötigt, da die Physik separat läuft
 
             # Blite den statischen Hintergrund, der die Hindernisse enthält.
             screen.blit(background, (0, 0))
             
-            # Aktualisiere die Anzeige des Spielers.
-            if self.player:
-                pos = self.player.body.position
-                color = (0, 128, 255)
-                pygame.draw.circle(screen, color, (int(pos.x), int(pos.y)), 15)
+            # Aktualisiere die Anzeige des Spielers mit seinem Sprite-Image.
+            if self.player and hasattr(self.player, 'image') and hasattr(self.player, 'rect'):
+                # Stelle sicher, dass das Sprite aktualisiert wurde (durch den Physik-Thread)
+                # Das player.update() wird im self.update() durch den Physik-Thread aufgerufen.
+                # Wir verwenden hier direkt das aktualisierte Image und Rect des Spielers.
+                screen.blit(self.player.image, self.player.rect)
             
             pygame.display.flip()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+            
+            clock.tick(FPS) # Begrenze die Framerate des Visualizers
 
         pygame.quit()
 

@@ -33,13 +33,22 @@ class Triangle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=position)
 
     def _create_base_image(self):
-        self.original_image.fill((0, 0, 0, 0))
+        self.original_image.fill((0, 0, 0, 0))  # Transparenter Hintergrund
+        # Berechne die Punkte des Dreiecks relativ zum Mittelpunkt der Surface
+        center_x, center_y = self.radius, self.radius
         points = [
-            (self.radius + self.radius * math.cos(math.radians(deg)),
-             self.radius - self.radius * math.sin(math.radians(deg)))
+            (center_x + self.radius * math.cos(math.radians(deg)),
+             center_y - self.radius * math.sin(math.radians(deg)))
             for deg in [0, 120, 240]
         ]
         pygame.draw.polygon(self.original_image, self.color, points)
+
+        # Füge einen Indikator an der Spitze hinzu (bei 0 Grad)
+        tip_x = center_x + self.radius * math.cos(math.radians(0))
+        tip_y = center_y - self.radius * math.sin(math.radians(0))
+        indicator_color = (255, 0, 0)  # Rot als Indikatorfarbe
+        indicator_radius = 3
+        pygame.draw.circle(self.original_image, indicator_color, (int(tip_x), int(tip_y)), indicator_radius)
 
     def update(self, dt):
         pos = self.body.position
