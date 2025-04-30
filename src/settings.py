@@ -8,7 +8,7 @@ SCREEN_HEIGHT = 600
 FPS = 30
 
 # Bewegungsparameter für den Spieler
-PLAYER_THRUST   =   30          # festgelegter Thrust-Wert
-PLAYER_ROTATION =   5     # festgelegter Rotationswert
+PLAYER_THRUST   =   20          # festgelegter Thrust-Wert
+PLAYER_ROTATION =   1     # festgelegter Rotationswert
 PLAYER_MAX_SPEED =  100      # maximale Geschwindigkeit
 PHYSICS_DT = 1/FPS          # Zeitintervall für Physik-Updates

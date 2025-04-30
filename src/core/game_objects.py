@@ -8,7 +8,6 @@ class Triangle(pygame.sprite.Sprite):
         self.color = color
         self.radius = 15
         self.game_world = game_world
-        self.thrust = 0
         mass = 1
         moment = pymunk.moment_for_poly(mass, [
             (self.radius, 0),
@@ -27,24 +26,27 @@ class Triangle(pygame.sprite.Sprite):
         self.shape.sprite_ref = self
         if game_world:
             game_world.space.add(self.body, self.shape)
-        self.image = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
-        self.update_image()
+        # Erstelle das ursprüngliche Bild und speichere es:
+        self.original_image = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
+        self._create_base_image()
+        self.image = self.original_image.copy()
         self.rect = self.image.get_rect(center=position)
 
-    def update_image(self):
-        self.image.fill((0, 0, 0, 0))
+    def _create_base_image(self):
+        self.original_image.fill((0, 0, 0, 0))
         points = [
             (self.radius + self.radius * math.cos(math.radians(deg)),
              self.radius - self.radius * math.sin(math.radians(deg)))
             for deg in [0, 120, 240]
         ]
-        pygame.draw.polygon(self.image, self.color, points)
+        pygame.draw.polygon(self.original_image, self.color, points)
 
     def update(self, dt):
         pos = self.body.position
         self.rect.center = (int(pos.x), int(pos.y))
         self.angle = math.degrees(self.body.angle)
-        rotated_image = pygame.transform.rotate(self.image, -self.angle)
+        # Berechne Rotation ausgehend vom Originalbild
+        rotated_image = pygame.transform.rotate(self.original_image, -self.angle)
         self.rect = rotated_image.get_rect(center=self.rect.center)
         self.image = rotated_image
 

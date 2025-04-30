@@ -5,7 +5,7 @@ from src.settings import API_HOST, API_PORT
 
 def run_api_server():
     # Starte den API-Server – Dieser nutzt die Startup Events (Physik-Engine wird dort gestartet).
-    uvicorn.run("upc_game.api.api_endpoints:app", host=API_HOST, port=API_PORT, log_level="info")
+    uvicorn.run("src.api.api_endpoints:app", host=API_HOST, port=API_PORT, log_level="info")
 
 if __name__ == "__main__":
     # Starte den API-Server in einem separaten Thread (als Daemon)
