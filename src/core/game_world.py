@@ -33,8 +33,9 @@ class GameWorld:
             pymunk.Segment(static_body, (self.width, 0), (self.width, self.height), 1)      # Rechter Rand
         ]
         for border in borders:
-            border.elasticity = 0.5  # perfekte Abprallwirkung
+            border.elasticity = 1.0  # perfekte Abprallwirkung
             border.friction = 0.0
+            border.collision_type = 3  # Set collision type for borders
             self.space.add(border)
 
     def initialize_world(self):
@@ -66,6 +67,22 @@ class GameWorld:
         if self.player:
             self.player.body.angle -= PLAYER_ROTATION
 
+    def shoot(self):
+        if self.player:
+            player_angle_rad = self.player.body.angle
+            offset_distance = self.player.radius + PROJECTILE_RADIUS + 1
+            start_offset_x = math.cos(player_angle_rad) * offset_distance
+            start_offset_y = math.sin(player_angle_rad) * offset_distance
+            start_pos = self.player.body.position + pymunk.Vec2d(start_offset_x, start_offset_y)
+
+            projectile = Projectile(
+                position=start_pos,
+                angle_rad=player_angle_rad,
+                owner=self.player, # *** NEU: Spieler als Owner übergeben ***
+                game_world=self
+            )
+            self.increment_shot_count()
+            print(f"Shot fired! Total shots: {self.shot_count}")
 
     def increment_shot_count(self):
         self.shot_count += 1
@@ -131,43 +148,39 @@ class GameWorld:
         pygame.display.set_caption("Game Visualizer")
         clock = pygame.time.Clock()
 
-        # Erzeuge einen statischen Hintergrund, auf dem nur die statischen Objekte (z.B. Hindernisse) gezeichnet werden.
+        all_sprites = pygame.sprite.Group() # Group to manage drawing
+
+        # Erzeuge einen statischen Hintergrund
         background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         background.fill((0, 0, 0))
-        # Zeichne statische Objekte (nicht den Spieler) einmalig:
-        state = self.to_dict()
-        for obj_data in state["objects"]: # Renamed 'obj' to 'obj_data' to avoid conflict
-            typ = obj_data["type"]
-            # Angenommen, der Spieler hat den Typ "triangle"
-            if typ != "triangle":
-                pos = obj_data["position"]
-                if typ in ("circleobstacle", "circle"):
-                    color = (128, 128, 128)
-                    radius = int(obj_data.get("radius", 15))
-                    pygame.draw.circle(background, color, (int(pos[0]), int(pos[1])), radius)
-                # Hier können weitere statische Objekttypen ergänzt werden.
+        static_sprites = pygame.sprite.Group() # Group for static objects
+        for obj in self.objects:
+             # Add obstacles to static group if they don't move
+             if isinstance(obj, CircleObstacle):
+                 static_sprites.add(obj)
+
+        static_sprites.draw(background) # Draw static obstacles onto background once
 
         running = True
         while running:
-            # dt = clock.tick(FPS) / 1000.0 # dt wird im Visualizer nicht benötigt, da die Physik separat läuft
+            screen.blit(background, (0, 0)) # Draw background with static elements
 
-            # Blite den statischen Hintergrund, der die Hindernisse enthält.
-            screen.blit(background, (0, 0))
-            
-            # Aktualisiere die Anzeige des Spielers mit seinem Sprite-Image.
-            if self.player and hasattr(self.player, 'image') and hasattr(self.player, 'rect'):
-                # Stelle sicher, dass das Sprite aktualisiert wurde (durch den Physik-Thread)
-                # Das player.update() wird im self.update() durch den Physik-Thread aufgerufen.
-                # Wir verwenden hier direkt das aktualisierte Image und Rect des Spielers.
-                screen.blit(self.player.image, self.player.rect)
-            
+            # Update sprite group membership - add new projectiles, remove destroyed ones
+            current_sprites = pygame.sprite.Group()
+            for obj in self.objects:
+                if isinstance(obj, pygame.sprite.Sprite):
+                    current_sprites.add(obj)
+
+            # Draw all current sprites (player, projectiles)
+            current_sprites.draw(screen)
+
             pygame.display.flip()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
             
-            clock.tick(FPS) # Begrenze die Framerate des Visualizers
+            clock.tick(FPS)
 
         pygame.quit()
 

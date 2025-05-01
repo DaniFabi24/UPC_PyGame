@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -64,4 +64,13 @@ def rotate_player_left():
         return {"message": "Spieler wurde nach links gedreht"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
-    
+
+@app.post("/shoot")
+async def shoot():
+    """Triggers the player to shoot a projectile."""
+    if game_world_instance.player:
+        game_world_instance.shoot()
+        return {"message": "Shoot command received"}
+    else:
+        raise HTTPException(status_code=404, detail="Player not found")
+
