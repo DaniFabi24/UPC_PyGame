@@ -33,44 +33,54 @@ def get_world_state():
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
-@app.post("/thrust_forward")
-def thrust_player_positive():
-    try:
-        game_world_instance.positive_player_thrust()
-        return {"message": "Spieler wurde in Blickrichtung beschleunigt"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+@app.post("/connect")
+async def connect_player():
+    """Connects a new player and returns their ID."""
+    player_id = game_world_instance.add_player()
+    # Optional: Initialen Spielzustand mitsenden
+    initial_state = game_world_instance.to_dict()
+    return {"player_id": player_id, "initial_state": initial_state}
 
-@app.post("/thrust_backward")
-def thrust_player_negative():
-    try:
-        game_world_instance.negative_player_thrust()
-        return {"message": "Spieler wurde gegen Blickrichtung beschleunigt"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-    
-@app.post("/rotate_right")
-def rotate_player_right():
-    try:
-        game_world_instance.right_player_rotation()
-        return {"message": "Spieler wurde nach rechts gedreht"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-    
-@app.post("/rotate_left")
-def rotate_player_left():
-    try:
-        game_world_instance.left_player_rotation()
-        return {"message": "Spieler wurde nach links gedreht"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+@app.post("/disconnect/{player_id}")
+async def disconnect_player(player_id: str):
+    """Disconnects a player."""
+    if player_id not in game_world_instance.players:
+         raise HTTPException(status_code=404, detail="Player not found")
+    game_world_instance.remove_player(player_id)
+    return {"message": f"Player {player_id} disconnected"}
 
-@app.post("/shoot")
-async def shoot():
-    """Triggers the player to shoot a projectile."""
-    if game_world_instance.player:
-        game_world_instance.shoot()
-        return {"message": "Shoot command received"}
-    else:
-        raise HTTPException(status_code=404, detail="Player not found")
+@app.post("/player/{player_id}/thrust_forward")
+async def thrust_forward(player_id: str):
+    if player_id not in game_world_instance.players:
+         raise HTTPException(status_code=404, detail="Player not found")
+    game_world_instance.positive_player_thrust(player_id)
+    return {"message": f"Player {player_id} thrust forward"}
+
+@app.post("/player/{player_id}/rotate_right")
+async def rotate_right(player_id: str):
+    if player_id not in game_world_instance.players:
+         raise HTTPException(status_code=404, detail="Player not found")
+    game_world_instance.right_player_rotation(player_id)
+    return {"message": f"Player {player_id} rotated right"}
+
+@app.post("/player/{player_id}/shoot")
+async def shoot(player_id: str):
+    if player_id not in game_world_instance.players:
+         raise HTTPException(status_code=404, detail="Player not found")
+    game_world_instance.shoot(player_id)
+    return {"message": f"Player {player_id} shot"}
+
+@app.post("/player/{player_id}/thrust_backward")
+async def thrust_backward(player_id: str):
+    if player_id not in game_world_instance.players:
+         raise HTTPException(status_code=404, detail="Player not found")
+    game_world_instance.negative_player_thrust(player_id)
+    return {"message": f"Player {player_id} thrust backward"}
+
+@app.post("/player/{player_id}/rotate_left")
+async def rotate_left(player_id: str):
+    if player_id not in game_world_instance.players:
+         raise HTTPException(status_code=404, detail="Player not found")
+    game_world_instance.left_player_rotation(player_id)
+    return {"message": f"Player {player_id} rotated left"}
 

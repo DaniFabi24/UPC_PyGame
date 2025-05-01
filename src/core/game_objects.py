@@ -71,17 +71,30 @@ class Triangle(pygame.sprite.Sprite):
             self.remove_from_world() # Beispiel: Spieler entfernen
 
     def remove_from_world(self):
-        """Entfernt den Spieler aus der Spielwelt."""
+        """Entfernt den Spieler aus der Spielwelt und allen relevanten Sammlungen."""
         if self.game_world:
+            # Aus Physik-Engine entfernen
             if self.body in self.game_world.space.bodies:
                 self.game_world.space.remove(self.body)
             if self.shape in self.game_world.space.shapes:
                 self.game_world.space.remove(self.shape)
+            
+            # Aus Objektliste entfernen
             if self in self.game_world.objects:
                 self.game_world.objects.remove(self)
-            if self.game_world.player is self:
-                self.game_world.player = None # Referenz im GameWorld löschen
-            self.kill() # Aus Sprite-Gruppen entfernen
+                
+            # Aus Spieler-Dictionary entfernen (anhand der ID)
+            player_id_to_remove = None
+            for pid, player_obj in self.game_world.players.items():
+                if player_obj is self:
+                    player_id_to_remove = pid
+                    break
+            if player_id_to_remove in self.game_world.players:
+                del self.game_world.players[player_id_to_remove]
+                print(f"Player {player_id_to_remove} removed from players dictionary.")
+
+        self.kill() # Aus Pygame Sprite-Gruppen entfernen
+        print(f"Player sprite killed.")
 
 class CircleObstacle(pygame.sprite.Sprite):
     def __init__(self, position, radius, color=(128, 128, 128), game_world=None):
