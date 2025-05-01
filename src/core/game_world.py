@@ -3,6 +3,7 @@ import pygame
 import threading
 import asyncio
 import uuid
+import math
 from .game_objects import *
 from ..settings import *
 
@@ -159,6 +160,61 @@ class GameWorld:
             ],
             "objects": [obj.to_dict() for obj in self.objects if not isinstance(obj, Triangle)],
             "shots_fired": self.shot_count,
+        }
+
+    def get_relative_state_for_player(self, player_id):
+        """
+        Gibt den Zustand relativ zu einem bestimmten Spieler zurück,
+        einschließlich der Lebenszahl und aller Objekte in einem bestimmten Radius.
+        """
+        player = self.players.get(player_id)
+        if not player:
+            return None
+
+        player_pos = player.body.position
+        player_angle_rad = player.body.angle
+        player_vel = player.body.velocity
+        player_angular_vel = player.body.angular_velocity
+        player_health = player.health
+        radius = SCANNING_RADIUS
+
+        nearby_objects_relative = []
+        for obj in self.objects:
+            if obj is player or not hasattr(obj, 'body'):
+                continue
+
+            obj_pos = obj.body.position
+            distance = player_pos.get_distance(obj_pos)
+
+            if distance <= radius:
+                delta_pos = obj_pos - player_pos
+                relative_pos_rotated = delta_pos.rotated(-player_angle_rad)
+
+                obj_vel = getattr(obj.body, 'velocity', pymunk.Vec2d(0, 0))
+                delta_vel = obj_vel - player_vel
+                relative_vel_rotated = delta_vel.rotated(-player_angle_rad)
+
+                obj_type = "unknown"
+                if isinstance(obj, CircleObstacle):
+                    obj_type = "obstacle"
+                elif isinstance(obj, Projectile):
+                    obj_type = "projectile"
+                elif isinstance(obj, Triangle):
+                    obj_type = "other_player"
+
+                nearby_objects_relative.append({
+                    "type": obj_type,
+                    "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
+                    "relative_velocity": [relative_vel_rotated.x, relative_vel_rotated.y],
+                    "distance": distance,
+                })
+
+        return {
+            "player_id": player_id,
+            "health": player_health,
+            "angular_velocity": player_angular_vel,
+            "velocity": [player_vel.x, player_vel.y],
+            "nearby_objects": nearby_objects_relative
         }
 
     def run_visualizer(self):

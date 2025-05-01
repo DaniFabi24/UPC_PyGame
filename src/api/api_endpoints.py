@@ -25,10 +25,14 @@ async def startup_event():
 def read_root():
     return {"message": "Welcome to the UPC Game API with WebSockets!"}
 
-@app.get("/world_state")
-def get_world_state():
+@app.get("/player/{player_id}/state")
+def get_world_state(player_id: str):
+    """Returns the state of the game world for a specific player."""
+    if player_id not in game_world_instance.players:
+        raise HTTPException(status_code=404, detail="Player not found")
     try:
-        state = game_world_instance.to_dict()
+        state = game_world_instance.get_relative_state_for_player(player_id)
+        # Optional: Hier kannst du den Zustand des Spielers zurückgeben
         return state
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})

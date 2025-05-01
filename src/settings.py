@@ -20,6 +20,7 @@ PROJECTILE_LIFETIME_SECONDS = 3.0  # Remove after 3 seconds
 # Player Settings
 PLAYER_START_HEALTH = 5 # *** Geändert auf 5 Leben ***
 OBSTACLE_DAMAGE = 1 # Schaden pro Kollision mit einem Hindernis (ggf. anpassen)
+SCANNING_RADIUS = 100 # Radius des Scanners (in Pixeln)
 
 # Projectile Settings
 PROJECTILE_DAMAGE = 1 # *** NEU: Schaden pro Projektiltreffer ***

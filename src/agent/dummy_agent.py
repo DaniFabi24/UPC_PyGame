@@ -1,6 +1,7 @@
 import pygame
 import requests
 import sys
+import json # Importiere json zum hübschen Drucken
 from ..settings import API_URL # Stelle sicher, dass API_URL korrekt ist
 
 class Agent:
@@ -27,6 +28,7 @@ class Agent:
          if self.player_id:
              try:
                  print(f"Disconnecting player {self.player_id}...")
+                 # *** Korrigierter Endpunkt für disconnect ***
                  response = requests.post(f"{API_URL}/disconnect/{self.player_id}")
                  response.raise_for_status()
                  print("Disconnected successfully.")
@@ -40,10 +42,49 @@ class Agent:
         try:
             url = f"{API_URL}/player/{self.player_id}/{action_path}"
             response = requests.post(url)
-            response.raise_for_status()
+            
+            # Fehlerbehandlung für 404 (Spieler nicht gefunden)
+            if response.status_code == 404:
+                print(f"Error: Player ID '{self.player_id}' not found on server. Stopping actions.")
+                self.player_id = None # ID zurücksetzen
+                # Hier könnte man die run-Schleife beenden oder reconnect versuchen
+                return 
+
+            response.raise_for_status() # Löst Fehler für andere HTTP-Fehlercodes aus
             # print(f"Action '{action_path}' sent.") # Optional: Weniger Output
         except requests.exceptions.RequestException as e:
             print(f"Error sending action '{action_path}': {e}")
+
+    # *** NEUE METHODE zum Abfragen des Zustands ***
+    def get_state(self):
+        if not self.player_id:
+            print("Error: No Player ID. Cannot get state.")
+            return None
+        try:
+            # *** Korrekter Endpunkt für relativen Zustand ***
+            url = f"{API_URL}/player/{self.player_id}/state" 
+            response = requests.get(url) # GET-Request verwenden
+            
+            if response.status_code == 404:
+                print(f"Error: Player ID '{self.player_id}' not found on server when getting state.")
+                self.player_id = None
+                return None
+
+            response.raise_for_status()
+            state_data = response.json()
+            print("-" * 20)
+            print("Current Relative State:")
+            # Hübsche Ausgabe des JSON
+            print(json.dumps(state_data, indent=2))
+            print("-" * 20)
+            return state_data
+        except requests.exceptions.RequestException as e:
+            print(f"Error getting state: {e}")
+            return None
+        except json.JSONDecodeError:
+            print("Error decoding state JSON from server.")
+            return None
+
 
     def run(self):
         pygame.init()
@@ -52,7 +93,7 @@ class Agent:
         clock = pygame.time.Clock()
 
         running = True
-        while running:
+        while running and self.player_id: # Schleife beenden, wenn player_id verloren geht
             screen.fill((255, 255, 255))
             pygame.display.flip()
 
@@ -62,17 +103,22 @@ class Agent:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         self.send_action("shoot")
+                    # *** NEU: Zustand bei Enter abfragen ***
+                    elif event.key == pygame.K_RETURN: 
+                        self.get_state() 
 
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_UP]:
-                self.send_action("thrust_forward")
-            elif keys[pygame.K_DOWN]:
-                self.send_action("thrust_backward") # Annahme: Endpunkt existiert
+            # Aktionen nur senden, wenn eine ID vorhanden ist
+            if self.player_id:
+                keys = pygame.key.get_pressed()
+                if keys[pygame.K_UP]:
+                    self.send_action("thrust_forward")
+                elif keys[pygame.K_DOWN]:
+                    self.send_action("thrust_backward") 
 
-            if keys[pygame.K_LEFT]:
-                self.send_action("rotate_left")
-            elif keys[pygame.K_RIGHT]:
-                self.send_action("rotate_right")
+                if keys[pygame.K_LEFT]:
+                    self.send_action("rotate_left")
+                elif keys[pygame.K_RIGHT]:
+                    self.send_action("rotate_right")
 
             clock.tick(30)
 
