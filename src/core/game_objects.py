@@ -5,21 +5,39 @@ import time
 from ..settings import *
 
 class Triangle(pygame.sprite.Sprite):
+    """
+    Represents a player character as a triangle.
+    
+    Handles both the physical representation (using pymunk) and the visual
+    representation (using pygame). Also manages spawn protection, health,
+    and removal from the game world.
+    """
     def __init__(self, position, angle=0, color=(0, 128, 255), game_world=None):
+        """
+        Initializes a new Triangle instance.
+        
+        Args:
+            position (tuple): Starting (x, y) position.
+            angle (float): Starting angle in degrees. Defaults to 0.
+            color (tuple): RGB color for the triangle.
+            game_world (GameWorld): Reference to the main game world.
+        """
         super().__init__()
         self.color = color
         self.radius = 15
         self.game_world = game_world
-        self.health = PLAYER_START_HEALTH # *** NEU: Leben hinzufügen ***
-        self.player_id = None # Wird von GameWorld gesetzt
-        # *** NEU: Spawn-Schutz Timer ***
-        self.spawn_protection_duration = 3.0 # Sekunden
+        self.health = PLAYER_START_HEALTH  # Set initial health
+        self.player_id = None  # To be assigned by the GameWorld
+        # Spawn protection prevents damage immediately after spawn.
+        self.spawn_protection_duration = 3.0  # Seconds of protection
         self.spawn_protection_until = time.time() + self.spawn_protection_duration
+
         mass = 1
         moment = pymunk.moment_for_poly(mass, [
             (self.radius, 0),
             (-self.radius, self.radius),
-            (-self.radius, -self.radius)])
+            (-self.radius, -self.radius)
+        ])
         self.body = pymunk.Body(mass, moment)
         self.body.position = position
         self.body.angle = math.radians(angle)
@@ -29,26 +47,31 @@ class Triangle(pygame.sprite.Sprite):
             (-self.radius, self.radius),
             (-self.radius, -self.radius)
         ])
-        self.shape.collision_type = 1
-        self.shape.sprite_ref = self
+        self.shape.collision_type = 1   # Collision type for players
+        self.shape.sprite_ref = self    # Link back to this sprite
+
         if game_world:
             game_world.space.add(self.body, self.shape)
-        # Erstelle das ursprüngliche Bild und speichere es:
+
+        # Create the base image for rendering, preserving an original version for rotations.
         self.original_image = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
         self._create_base_image()
         self.image = self.original_image.copy()
         self.rect = self.image.get_rect(center=position)
 
     def _create_base_image(self):
-        # Erstelle eine quadratische Surface, die groß genug ist, um das rotierte Dreieck aufzunehmen
-        # Der Durchmesser des Umkreises eines gleichseitigen Dreiecks ist 2*Radius
-        # Die Diagonale eines Quadrats, das das rotierte Dreieck umschließt, ist etwas größer
-        size = int(self.radius * 2 * 1.5) # Sicherheitsfaktor
+        """
+        Creates the original (non-rotated) image for the triangle sprite.
+        
+        The image is created on a transparent surface taking into account rotation.
+        Also draws a small white circle at the tip as an indicator.
+        """
+        size = int(self.radius * 2 * 1.5)  # Safety factor for rotations
         self.original_image = pygame.Surface((size, size), pygame.SRCALPHA)
-        self.original_image.fill((0, 0, 0, 0)) # Transparenter Hintergrund
+        self.original_image.fill((0, 0, 0, 0))  # Transparent background
 
-        # Berechne die Punkte des Dreiecks relativ zum Mittelpunkt der Surface
-        center_x, center_y = size // 2, size // 2 # Mittelpunkt der größeren Surface
+        # Calculate triangle points relative to the center of the surface.
+        center_x, center_y = size // 2, size // 2
         points = [
             (center_x + self.radius * math.cos(math.radians(deg)),
              center_y - self.radius * math.sin(math.radians(deg)))
@@ -56,57 +79,69 @@ class Triangle(pygame.sprite.Sprite):
         ]
         pygame.draw.polygon(self.original_image, self.color, points)
 
-        # Füge einen Indikator an der Spitze hinzu (bei 0 Grad)
+        # Draw an indicator at the tip (at 0°)
         tip_x = center_x + self.radius * math.cos(math.radians(0))
         tip_y = center_y - self.radius * math.sin(math.radians(0))
-        indicator_color = (255, 255, 255)  # *** Weiß als Indikatorfarbe ***
+        indicator_color = (255, 255, 255)  # White indicator
         indicator_radius = 3
         pygame.draw.circle(self.original_image, indicator_color, (int(tip_x), int(tip_y)), indicator_radius)
 
     def update(self, dt):
+        """
+        Updates the Triangle sprite's position, rotation, and visual effects.
+        
+        The new position is taken from the physics body. The sprite image is also rotated.
+        Additionally, if the sprite is still under spawn protection, it is drawn semi-transparent.
+        
+        Args:
+            dt (float): Delta time since the last update.
+        """
         pos = self.body.position
         self.rect.center = (int(pos.x), int(pos.y))
         self.angle = math.degrees(self.body.angle)
-        # Berechne Rotation ausgehend vom Originalbild
         rotated_image = pygame.transform.rotate(self.original_image, -self.angle)
         self.rect = rotated_image.get_rect(center=self.rect.center)
         self.image = rotated_image
-        # *** Optional: Visuelles Feedback für Spawn-Schutz ***
+
+        # Change transparency if still under spawn protection.
         if time.time() < self.spawn_protection_until:
-            # Lässt das Sprite leicht transparent erscheinen
-            alpha = 128 # 0=transparent, 255=opak
-            self.image.set_alpha(alpha)
+            self.image.set_alpha(128)  # Semi-transparent
         else:
-            # Normale Deckkraft wiederherstellen
-            self.image.set_alpha(255)
+            self.image.set_alpha(255)  # Fully opaque
 
     def take_damage(self, amount):
-        """Reduziert die Lebenspunkte des Spielers."""
-        # *** NEU: Spawn-Schutz Prüfung ***
+        """
+        Reduces the player's health by the specified amount.
+        
+        Damage is ignored if spawn protection is active. If health drops to zero or below,
+        the player is removed from the game world.
+        
+        Args:
+            amount (int or float): The damage to apply.
+        """
         if time.time() < self.spawn_protection_until:
             print(f"Player {self.player_id} is spawn protected. Damage ignored.")
-            return # Keinen Schaden nehmen
+            return
 
         self.health -= amount
         print(f"Player {self.player_id} took {amount} damage. Current health: {self.health}")
         if self.health <= 0:
             print(f"Player {self.player_id} destroyed!")
-            self.remove_from_world() # Spieler entfernen
+            self.remove_from_world()
 
     def remove_from_world(self):
-        """Entfernt den Spieler aus der Spielwelt und allen relevanten Sammlungen."""
+        """
+        Removes the player from the physics space, game world's object lists,
+        and any sprite groups.
+        """
         if self.game_world:
-            # Aus Physik-Engine entfernen
             if self.body in self.game_world.space.bodies:
                 self.game_world.space.remove(self.body)
             if self.shape in self.game_world.space.shapes:
                 self.game_world.space.remove(self.shape)
-            
-            # Aus Objektliste entfernen
             if self in self.game_world.objects:
                 self.game_world.objects.remove(self)
-                
-            # Aus Spieler-Dictionary entfernen (anhand der ID)
+            # Remove from players dictionary.
             player_id_to_remove = None
             for pid, player_obj in self.game_world.players.items():
                 if player_obj is self:
@@ -115,12 +150,26 @@ class Triangle(pygame.sprite.Sprite):
             if player_id_to_remove in self.game_world.players:
                 del self.game_world.players[player_id_to_remove]
                 print(f"Player {player_id_to_remove} removed from players dictionary.")
-
-        self.kill() # Aus Pygame Sprite-Gruppen entfernen
-        print(f"Player sprite killed.")
+        self.kill()  # Remove from all pygame sprite groups
+        print("Player sprite killed.")
 
 class CircleObstacle(pygame.sprite.Sprite):
+    """
+    Represents a static circular obstacle that is part of the game arena.
+    
+    It is added to the physics space as a static body. It also has a visual representation
+    drawn using pygame.
+    """
     def __init__(self, position, radius, color=(128, 128, 128), game_world=None):
+        """
+        Initializes a new CircleObstacle.
+        
+        Args:
+            position (tuple): (x, y) position for the obstacle.
+            radius (int): Radius of the circle.
+            color (tuple): RGB color.
+            game_world (GameWorld): Reference to the game world.
+        """
         super().__init__()
         self.color = color
         self.radius = radius
@@ -130,11 +179,10 @@ class CircleObstacle(pygame.sprite.Sprite):
         self.body = pymunk.Body(body_type=pymunk.Body.STATIC)
         self.body.position = position
         self.shape = pymunk.Circle(self.body, radius)
-        self.shape.collision_type = 2
+        self.shape.collision_type = 2   # Collision type for obstacles
         self.shape.sprite_ref = self
-        # Set physical properties for bouncing interaction
-        self.shape.elasticity = 0.9 # Make obstacles bouncy too
-        self.shape.friction = 0.5   # Some friction
+        self.shape.elasticity = 0.9     # Makes obstacle bouncy
+        self.shape.friction = 0.5
 
         if game_world:
             game_world.space.add(self.body, self.shape)
@@ -143,10 +191,22 @@ class CircleObstacle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=position)
 
     def update(self, dt):
+        """
+        Updates the obstacle's position in case of external movement.
+        
+        Args:
+            dt (float): Delta time since last update.
+        """
         pos = self.body.position
         self.rect.center = (int(pos.x), int(pos.y))
 
     def to_dict(self):
+        """
+        Serializes the obstacle for external use (e.g., networking).
+        
+        Returns:
+            dict: Dictionary containing type, position, and radius.
+        """
         return {
             "type": "circle",
             "position": [self.body.position.x, self.body.position.y],
@@ -154,192 +214,262 @@ class CircleObstacle(pygame.sprite.Sprite):
         }
 
 class Projectile(pygame.sprite.Sprite):
-    # Füge 'color' als Parameter hinzu und entferne den Default aus settings
+    """
+    Represents a projectile fired by a player.
+    
+    The projectile is subject to physics simulation and has a limited lifetime. It is removed
+    from the game world when its lifetime expires or upon collisions.
+    """
     def __init__(self, position, angle_rad, owner, color, radius=PROJECTILE_RADIUS, speed=PROJECTILE_SPEED, game_world=None):
+        """
+        Initializes a new Projectile instance.
+        
+        Args:
+            position (tuple): Starting (x, y) position.
+            angle_rad (float): Firing angle in radians.
+            owner (Triangle): The player who fired the projectile.
+            color (tuple): Color for the projectile.
+            radius (int): Radius for both physics shape and drawing.
+            speed (int): Speed at which the projectile is fired.
+            game_world (GameWorld): Reference to the game world.
+        """
         super().__init__()
-        self.color = color # *** NEU: Farbe speichern ***
+        self.color = color
         self.radius = radius
         self.game_world = game_world
-        self.lifetime = PROJECTILE_LIFETIME_SECONDS # Seconds until the projectile is removed
-        self.owner = owner # *** NEU: Besitzer des Projektils speichern ***
+        self.lifetime = PROJECTILE_LIFETIME_SECONDS  # Time before expiration
+        self.owner = owner  # The firing player
 
-        mass = 0.1 # Projectiles should be light
+        mass = 0.1  # Light weight for projectiles
         moment = pymunk.moment_for_circle(mass, 0, radius)
         self.body = pymunk.Body(mass, moment)
         self.body.position = position
-        self.body.angle = angle_rad # Set initial angle if needed, though velocity is key
+        self.body.angle = angle_rad
         
-        # Calculate initial velocity based on angle and speed
+        # Calculate initial velocity based on the firing angle and speed
         velocity_x = math.cos(angle_rad) * speed
         velocity_y = math.sin(angle_rad) * speed
         self.body.velocity = (velocity_x, velocity_y)
 
         self.shape = pymunk.Circle(self.body, radius)
-        self.shape.collision_type = 4 # Assign a new collision type for projectiles
-        self.shape.sensor = False # Make sure it collides
-        self.shape.sprite_ref = self # Reference for updates/drawing
-        self.shape.elasticity = 0.6 # Make obstacles bouncy too
-        self.shape.friction = 0.1   # Some friction
-        # *** WICHTIG: Filter anpassen, damit Projektil NICHT mit dem Schützen kollidiert ***
-        # Gruppe 1 für Spieler, Gruppe 2 für Projektile (Beispiel)
-        # Projektile (Gruppe 2) kollidieren nicht mit Spieler (Gruppe 1)
-        # Sie kollidieren aber mit Hindernissen und Rändern (die keine Gruppe haben oder Gruppe 0)
-        # Und sie kollidieren mit anderen Spielern (falls Multiplayer, die auch Gruppe 1 haben könnten)
-        # Für Einzelspieler reicht es oft, die Kollision mit dem *eigenen* Spieler zu verhindern.
-        # Wir verwenden hier den Owner-Check im Handler statt Filter für mehr Flexibilität.
-        # self.shape.filter = pymunk.ShapeFilter(group=1) # Vorerst auskommentiert, da wir Owner-Check machen
+        self.shape.collision_type = 4  # Collision type for projectiles
+        self.shape.sensor = False      # Projectile affects collisions
+        self.shape.sprite_ref = self
+        self.shape.elasticity = 0.6    # Bounciness
+        self.shape.friction = 0.1
+        # Note: Owner-check in collision handler prevents damage to the firing player.
 
         if game_world:
             game_world.space.add(self.body, self.shape)
-            game_world.add_object(self) # Add to the game world's object list
+            game_world.add_object(self)
 
-        # Create the visual representation using the passed color
+        # Create the visual representation
         self.image = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-        # *** Nutze die übergebene Farbe ***
         pygame.draw.circle(self.image, self.color, (radius, radius), radius)
         self.rect = self.image.get_rect(center=position)
 
     def update(self, dt):
-        # Update position for drawing
+        """
+        Updates the projectile's position and decreases its lifetime.
+        
+        Args:
+            dt (float): Delta time since last update.
+        """
         pos = self.body.position
         self.rect.center = (int(pos.x), int(pos.y))
         
-        # Decrease lifetime and remove if expired
+        # Decrease lifetime and remove if expired.
         self.lifetime -= dt
         if self.lifetime <= 0:
             self.remove_from_world()
 
     def remove_from_world(self):
-         if self.game_world:
+        """
+        Removes the projectile from the physics space, game objects list,
+        and all sprite groups.
+        """
+        if self.game_world:
             if self.body in self.game_world.space.bodies:
                 self.game_world.space.remove(self.body)
             if self.shape in self.game_world.space.shapes:
                 self.game_world.space.remove(self.shape)
             if self in self.game_world.objects:
                 self.game_world.objects.remove(self)
-            self.kill() # Remove from any sprite groups
+            self.kill()  # Remove sprite from all groups
 
     def to_dict(self):
-         # Optional: For serialization if needed
-         return {
-             "type": "projectile",
-             "position": [self.body.position.x, self.body.position.y],
-             "radius": self.radius
-         }
+        """
+        Serializes the projectile state.
+        
+        Returns:
+            dict: Dictionary containing type, position, and radius.
+        """
+        return {
+            "type": "projectile",
+            "position": [self.body.position.x, self.body.position.y],
+            "radius": self.radius
+        }
+
+# ---------------- Collision Handlers ----------------
 
 def collision_begin(arbiter, space, data):
+    """
+    A generic collision begin handler that increments the player collision counter.
+    
+    Args:
+        arbiter (pymunk.Arbiter): Contains collision shapes.
+        space (pymunk.Space): The physics space.
+        data (dict): Additional data (expects 'game_world').
+    
+    Returns:
+        bool: True to process the collision normally.
+    """
     shape_a, shape_b = arbiter.shapes
     game_world = data.get("game_world", None)
     if game_world:
         game_world.player_collisions += 1
-    return True  
+    return True
 
 def player_hit_obstacle(arbiter, space, data):
-    """Handles collision between player (1) and obstacle (2)."""
+    """
+    Handles collision between a player and an obstacle.
+    
+    Increments the collision counter and prints the player's health.
+    Accounts for cases where shapes may be in the reverse order.
+    
+    Args:
+        arbiter (pymunk.Arbiter): Contains collision information.
+        space (pymunk.Space): The physics space.
+        data (dict): Expects 'game_world'.
+    
+    Returns:
+        bool: True, so that pymunk resolves the collision (bouncing, etc.).
+    """
     player_shape, obstacle_shape = arbiter.shapes
     game_world = data.get("game_world", None)
 
-    # Sicherstellen, dass es sich um den Spieler handelt und er Schaden nehmen kann
     if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
         player_sprite = player_shape.sprite_ref
-        # player_sprite.take_damage(OBSTACLE_DAMAGE)
-        game_world.player_collisions += 1 # Kollisionen weiter zählen
+        # Optionally, apply damage here: player_sprite.take_damage(OBSTACLE_DAMAGE)
+        game_world.player_collisions += 1
         print(f"Player collided with obstacle. Health: {player_sprite.health}")
     else:
-         # Fallback, falls die Shapes vertauscht sind
-         player_shape, obstacle_shape = obstacle_shape, player_shape
-         if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
-             player_sprite = player_shape.sprite_ref
-             # player_sprite.take_damage(OBSTACLE_DAMAGE)
-             game_world.player_collisions += 1
-             print(f"Player collided with obstacle (reversed shapes). Health: {player_sprite.health}")
+        # If shapes are reversed, swap and try again.
+        player_shape, obstacle_shape = obstacle_shape, player_shape
+        if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
+            player_sprite = player_shape.sprite_ref
+            # Optionally, apply damage here.
+            game_world.player_collisions += 1
+            print(f"Player collided with obstacle (reversed shapes). Health: {player_sprite.health}")
 
-    # True zurückgeben, damit Pymunk die Kollision physikalisch auflöst (Abprallen etc.)
     return True
 
 def projectile_hit_player(arbiter, space, data):
-    """Handles collision between projectile (4) and player (1)."""
+    """
+    Handles collision between a projectile and a player.
+    
+    Applies damage to the player, removes the projectile, and checks for friendly fire.
+    
+    Args:
+        arbiter (pymunk.Arbiter): Contains collision shapes.
+        space (pymunk.Space): The physics space.
+        data (dict): Expects 'game_world'.
+    
+    Returns:
+        bool: True if collision should be processed further; False otherwise.
+    """
     projectile_shape, player_shape = arbiter.shapes
     game_world = data.get("game_world", None)
 
     projectile = getattr(projectile_shape, 'sprite_ref', None)
     player = getattr(player_shape, 'sprite_ref', None)
 
-    # Sicherstellen, dass beide Objekte existieren und vom richtigen Typ sind
     if not isinstance(projectile, Projectile) or not isinstance(player, Triangle):
-        # Vertauschte Reihenfolge prüfen (falls Pymunk sie anders übergibt)
+        # Try swapping shapes if order is reversed.
         projectile_shape, player_shape = player_shape, projectile_shape
         projectile = getattr(projectile_shape, 'sprite_ref', None)
         player = getattr(player_shape, 'sprite_ref', None)
         if not isinstance(projectile, Projectile) or not isinstance(player, Triangle):
-             print("Collision 4-1: Invalid shapes found.")
-             return False # Kollision ignorieren, wenn Objekte nicht passen
+            print("Collision 4-1: Invalid shapes found.")
+            return False
 
-    # Eigenbeschuss prüfen
+    # Prevent self-hit if friendly fire is disabled.
     if not ALLOW_FRIENDLY_FIRE and projectile.owner is player:
         print("Friendly fire disabled, ignoring hit.")
-        # Projektil NICHT entfernen, damit es weiterfliegt
-        return False # Kollision ignorieren (kein Schaden, kein Abprall)
+        return False
 
-    # Schaden anwenden
     print(f"Player hit by projectile! Applying {PROJECTILE_DAMAGE} damage.")
     player.take_damage(PROJECTILE_DAMAGE)
-
-    # Projektil nach Treffer entfernen
     projectile.remove_from_world()
+    return True
 
-    # True zurückgeben, damit Pymunk die Kollision physikalisch kurz auflöst
-    # (obwohl das Projektil entfernt wird, kann es einen kleinen Impuls geben)
-    # False wäre auch möglich, wenn der Impuls unerwünscht ist.
+def projectile_hit_obstacle(arbiter, space, data):
+    """
+    Handles collision between a projectile and an obstacle.
+    
+    Prints a debug message and allows pymunk to resolve the collision by bouncing.
+    
+    Args:
+        arbiter (pymunk.Arbiter): Contains collision shapes.
+        space (pymunk.Space): The physics space.
+        data (dict): Expects 'game_world'.
+    
+    Returns:
+        bool: True to allow normal collision resolution.
+    """
+    projectile_shape, obstacle_shape = arbiter.shapes
+    print("Projectile hit obstacle - bouncing off.")
+    return True
+
+def projectile_hit_border(arbiter, space, data):
+    """
+    Handles collision between a projectile and the game border.
+    
+    Removes the projectile upon collision.
+    
+    Args:
+        arbiter (pymunk.Arbiter): Contains collision shapes.
+        space (pymunk.Space): The physics space.
+        data (dict): Expects 'game_world'.
+    
+    Returns:
+        bool: True to allow border collision handling.
+    """
+    projectile_shape, border_shape = arbiter.shapes
+    if hasattr(projectile_shape, 'sprite_ref') and isinstance(projectile_shape.sprite_ref, Projectile):
+        projectile_shape.sprite_ref.remove_from_world()
     return True
 
 def setup_collision_handlers(space, game_world):
-    # Handler für Spieler (1) vs Hindernis (2)
+    """
+    Sets up collision handlers for the physics space.
+    
+    Handlers for collisions between:
+        - Player (1) and Obstacle (2)
+        - Projectile (4) and Obstacle (2)
+        - Projectile (4) and Border (3)
+        - Projectile (4) and Player (1)
+    
+    Args:
+        space (pymunk.Space): The physics space to set up handlers in.
+        game_world (GameWorld): Reference to the game world (passed as data).
+    """
+    # Player (1) vs Obstacle (2)
     handler_player_obstacle = space.add_collision_handler(1, 2)
-    # *** NEU: Den spezifischen Handler verwenden ***
     handler_player_obstacle.begin = player_hit_obstacle
     handler_player_obstacle.data["game_world"] = game_world
 
-    # Handler für Projektil (4) vs Hindernis (2)
+    # Projectile (4) vs Obstacle (2)
     handler_projectile_obstacle = space.add_collision_handler(4, 2)
     handler_projectile_obstacle.begin = projectile_hit_obstacle
     handler_projectile_obstacle.data["game_world"] = game_world
 
-    # Handler für Projektil (4) vs Rand (3)
+    # Projectile (4) vs Border (3)
     handler_projectile_border = space.add_collision_handler(4, 3)
     handler_projectile_border.begin = projectile_hit_border
     handler_projectile_border.data["game_world"] = game_world
 
-    # *** NEU: Handler für Projektil (4) vs Spieler (1) ***
+    # Projectile (4) vs Player (1)
     handler_projectile_player = space.add_collision_handler(4, 1)
     handler_projectile_player.begin = projectile_hit_player
     handler_projectile_player.data["game_world"] = game_world
-
-    # Optional: Handler für Spieler (1) vs Rand (3)
-    # ...
-
-def projectile_hit_obstacle(arbiter, space, data):
-    """Handles collision between projectile (4) and obstacle (2)."""
-    projectile_shape, obstacle_shape = arbiter.shapes
-    
-    # --- Entferne oder kommentiere diese Zeilen aus, um das Projektil NICHT zu entfernen ---
-    # if hasattr(projectile_shape, 'sprite_ref') and isinstance(projectile_shape.sprite_ref, Projectile):
-    #     projectile_shape.sprite_ref.remove_from_world()
-         
-    # Optional: Füge hier Logik hinzu, wenn das Hindernis Schaden nehmen soll etc.
-    # Zum Beispiel:
-    # if hasattr(obstacle_shape, 'sprite_ref') and hasattr(obstacle_shape.sprite_ref, 'take_damage'):
-    #      obstacle_shape.sprite_ref.take_damage(10) # Beispiel: 10 Schaden
-
-    print("Projectile hit obstacle - bouncing off.") # Debug-Ausgabe
-
-    # Gib True zurück, damit Pymunk die Kollision physikalisch auflöst (Abprallen)
-    # basierend auf den elasticity/friction Werten der Shapes.
-    return True 
-
-def projectile_hit_border(arbiter, space, data):
-    # Projektile werden weiterhin am Rand entfernt
-    projectile_shape, border_shape = arbiter.shapes
-    if hasattr(projectile_shape, 'sprite_ref') and isinstance(projectile_shape.sprite_ref, Projectile):
-         projectile_shape.sprite_ref.remove_from_world()
-    return True

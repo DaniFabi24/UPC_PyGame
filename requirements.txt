@@ -1,14 +1,10 @@
-# The following packages are required for the game:
+# Required external libraries for the UPC_PyGame project:
 
-fastapi         # For building the API (external library)
-uvicorn         # ASGI server to run the FastAPI application (external library)
-pygame          # For 2D graphics and visualization (external library)
-pymunk          # For the 2D physics engine (external library)
+fastapi         # For building the web API
+uvicorn         # ASGI server to run the FastAPI application
+pygame          # For 2D graphics, visualization, and input handling (in agent)
+pymunk          # For the 2D physics engine simulation
+requests        # For making HTTP requests (used by the agent to communicate with the API)
 
-asyncio         # For asynchronous programming (Python standard library)
-#math            # For mathematical operations (Python standard library)
-#time            # For time-related functions (Python standard library)
-#subprocess      # For running external commands (Python standard library)
-requests        # For making HTTP requests (external library - though often included)
-
-# End of package list
+# Standard libraries like asyncio, math, time, threading, uuid, random, sys, jsonsys, json
+# are part of Python and do not need to be listed here.

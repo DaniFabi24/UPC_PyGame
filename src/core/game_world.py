@@ -9,44 +9,68 @@ import time
 from .game_objects import *
 from ..settings import *
 
+# Predefined player colors used cyclically when creating new players.
 PLAYER_COLORS = [
     (255, 0, 0),     # Red
-    (0, 191, 255),   # Deep Sky Blue (Helleres Blau)
-    (50, 205, 50),   # Lime Green (Etwas dunkler, aber immer noch hell)
+    (0, 191, 255),   # Deep Sky Blue
+    (50, 205, 50),   # Lime Green
     (255, 255, 0),   # Yellow
     (0, 255, 255),   # Cyan
     (255, 0, 255),   # Magenta
     (255, 165, 0),   # Orange
-    (238, 130, 238), # Violet (Helleres Lila)
+    (238, 130, 238), # Violet
     (255, 255, 255), # White
-    (192, 192, 192)  # Silver (Helleres Grau)
+    (192, 192, 192)  # Silver
 ]
-NEXT_COLOR_INDEX = 0 # Globale Variable oder besser in GameWorld
+NEXT_COLOR_INDEX = 0  # Global variable to keep track of next player color (also managed in GameWorld)
 
 class GameWorld:
+    """
+    The GameWorld class encapsulates the entire state of the game.
+    
+    It manages the physics simulation (using pymunk), rendering (using pygame), 
+    players, obstacles, projectiles, and power-ups. It also provides methods to 
+    add/remove players/objects, update the simulation, and run the visualizer.
+    """
     def __init__(self, width, height):
+        """
+        Initializes the GameWorld instance.
+        
+        Args:
+            width (int): Width of the game world (and visualization screen).
+            height (int): Height of the game world.
+        """
         self.width = width
         self.height = height
         self.space = pymunk.Space()
         self.space.gravity = (0, 0)
-        self.objects = [] 
-        self.players = {}
-        self.shot_count = 0
-        self.player_collisions = 0
-        self._physics_task = None
-        self.is_running = False
-        self.next_color_index = 0 # Index für die nächste Spielerfarbe
-        self.add_borders()
-        
+        self.objects = []    # List of non-player objects (obstacles, projectiles, power-ups, etc.)
+        self.players = {}    # Dictionary mapping player IDs to player objects
+        self.shot_count = 0  # Total number of shots fired
+        self.player_collisions = 0  # Counter for collisions involving players
+        self._physics_task = None   # Holds the asyncio task for the physics loop
+        self.is_running = False     # Flag indicating whether the physics loop is active
+        self.next_color_index = 0   # Index to select the next player color from PLAYER_COLORS
+
+        self.add_borders()  # Create and add border segments to the physics space
+
     def add_player(self):
-        """Erstellt einen neuen Spieler mit einer eindeutigen Farbe."""
+        """
+        Creates and adds a new player to the game.
+        
+        It attempts to find a safe spawn position (without collisions with existing players/obstacles)
+        and assigns a unique ID and a pre-defined color to the player.
+        
+        Returns:
+            str or None: The player's unique ID if spawn is successful; otherwise, None.
+        """
         player_id = str(uuid.uuid4())
         max_attempts = 10
         safe_spawn_pos = None
         player_radius = 15
 
         for attempt in range(max_attempts):
-            # ... (Positionsauswahl wie zuvor) ...
+            # For the first attempt, use the center of the screen; afterwards, random positions.
             if attempt == 0:
                 potential_pos = pymunk.Vec2d(self.width / 2, self.height / 2)
             else:
@@ -56,7 +80,7 @@ class GameWorld:
                     random.uniform(pad, self.height - pad)
                 )
 
-            # ... (Erstellung von temp_body und temp_shape wie zuvor) ...
+            # Create a temporary body/shape to test for collisions.
             temp_body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
             temp_body.position = potential_pos
             temp_shape = pymunk.Poly(temp_body, [
@@ -66,19 +90,16 @@ class GameWorld:
             ])
             temp_shape.collision_type = 1
 
-            # Prüfe auf Kollisionen mit bestehenden Shapes im Space
-            # *** Relevant sind Hindernisse (Typ 2) UND andere Spieler (Typ 1) ***
+            # Check for collisions with obstacles (type 2) or existing players (type 1)
             query_info = self.space.shape_query(temp_shape)
-
             collision_found = False
             colliding_type = None
             for info in query_info:
-                # Prüfe, ob die Kollision mit einem Hindernis (Typ 2) oder Spieler (Typ 1) stattfindet
-                if info.shape and info.shape.collision_type in [1, 2]: # *** Prüfung auf Typ 1 und 2 ***
-                     collision_found = True
-                     colliding_type = info.shape.collision_type
-                     print(f"Spawn attempt {attempt+1} at {potential_pos} failed: Collision with type {colliding_type}.")
-                     break # Kollision gefunden, nächste Position versuchen
+                if info.shape and info.shape.collision_type in [1, 2]:
+                    collision_found = True
+                    colliding_type = info.shape.collision_type
+                    print(f"Spawn attempt {attempt+1} at {potential_pos} failed: Collision with type {colliding_type}.")
+                    break
 
             if not collision_found:
                 safe_spawn_pos = potential_pos
@@ -86,11 +107,11 @@ class GameWorld:
                 break
 
         if safe_spawn_pos:
-            # Wähle die nächste Farbe aus der Liste
+            # Choose the next available color for the new player.
             player_color = PLAYER_COLORS[self.next_color_index % len(PLAYER_COLORS)]
-            self.next_color_index += 1 # Erhöhe den Index für den nächsten Spieler
+            self.next_color_index += 1
 
-            # Übergebe die Farbe an den Triangle Konstruktor
+            # Create a new Triangle (player) with chosen color and safe spawn position.
             new_player = Triangle(safe_spawn_pos, color=player_color, game_world=self)
             new_player.player_id = player_id
             self.players[player_id] = new_player
@@ -102,40 +123,57 @@ class GameWorld:
             return None
 
     def remove_player(self, player_id):
-        """Entfernt einen Spieler anhand seiner ID, indem die Methode des Spielers aufgerufen wird."""
+        """
+        Removes a player from the game using its ID.
+        
+        Delegates the removal process to the player's own remove_from_world method.
+        
+        Args:
+            player_id (str): The unique identifier of the player to remove.
+        """
         if player_id in self.players:
             player_to_remove = self.players[player_id]
             print(f"Attempting to remove player {player_id}...")
-            # Delegiere die eigentliche Entfernung an das Spielerobjekt
             player_to_remove.remove_from_world()
-            # Das Löschen aus self.players geschieht jetzt in remove_from_world
             print(f"Player remove process initiated for ID: {player_id}")
         else:
             print(f"Attempted to remove non-existent player ID: {player_id}")
 
     def add_object(self, obj):
+        """
+        Adds a game object (obstacle, projectile, power-up, etc.) to the world.
+        
+        Args:
+            obj: The game object to add.
+        """
         if obj not in self.objects:
             self.objects.append(obj)
-            # Physik-Engine hinzufügen, falls noch nicht geschehen (in Triangle.__init__)
-            # if isinstance(obj, (Triangle, CircleObstacle, Projectile)):
-            #    if obj.body not in self.space.bodies: self.space.add(obj.body, obj.shape)
 
     def add_borders(self):
+        """
+        Creates border segments around the game world and adds them to the physics space.
+        
+        The borders are used to contain the game objects inside the visible area.
+        """
         static_body = self.space.static_body
         borders = [
-            pymunk.Segment(static_body, (0, 0), (self.width, 0), 1),            # Unterer Rand
-            pymunk.Segment(static_body, (0, self.height), (self.width, self.height), 1),  # Oberer Rand
-            pymunk.Segment(static_body, (0, 0), (0, self.height), 1),             # Linker Rand
-            pymunk.Segment(static_body, (self.width, 0), (self.width, self.height), 1)      # Rechter Rand
+            pymunk.Segment(static_body, (0, 0), (self.width, 0), 1),              # Bottom border
+            pymunk.Segment(static_body, (0, self.height), (self.width, self.height), 1),  # Top border
+            pymunk.Segment(static_body, (0, 0), (0, self.height), 1),               # Left border
+            pymunk.Segment(static_body, (self.width, 0), (self.width, self.height), 1)      # Right border
         ]
         for border in borders:
-            border.elasticity = 1.0  # perfekte Abprallwirkung
+            border.elasticity = 1.0  # Perfect bounce
             border.friction = 0.0
-            border.collision_type = 3  # Set collision type for borders
+            border.collision_type = 3  # Collision type for borders
             self.space.add(border)
 
     def initialize_world(self):
-        # Add obstacles to create an arena-like environment
+        """
+        Initializes the game world by adding predefined obstacles to create an arena.
+        
+        Also sets up collision handlers for various game object interactions.
+        """
         arena_obstacles = [
             CircleObstacle([150, 150], 40, game_world=self),
             CircleObstacle([650, 150], 40, game_world=self),
@@ -152,6 +190,12 @@ class GameWorld:
         setup_collision_handlers(self.space, self)
 
     def positive_player_thrust(self, player_id):
+        """
+        Applies a forward thrust to the specified player.
+        
+        Args:
+            player_id (str): The identifier of the player.
+        """
         player = self.players.get(player_id)
         if player:
             radians = player.body.angle
@@ -159,6 +203,12 @@ class GameWorld:
             player.body.velocity += thrust_vector
 
     def negative_player_thrust(self, player_id):
+        """
+        Applies a reverse thrust (braking) to the specified player.
+        
+        Args:
+            player_id (str): The identifier of the player.
+        """
         player = self.players.get(player_id)
         if player:
             radians = player.body.angle
@@ -166,45 +216,75 @@ class GameWorld:
             player.body.velocity += thrust_vector
 
     def right_player_rotation(self, player_id):
+        """
+        Rotates a player to the right.
+        
+        Args:
+            player_id (str): The identifier of the player.
+        """
         player = self.players.get(player_id)
         if player:
             player.body.angle += PLAYER_ROTATION
 
     def left_player_rotation(self, player_id):
+        """
+        Rotates a player to the left.
+        
+        Args:
+            player_id (str): The identifier of the player.
+        """
         player = self.players.get(player_id)
         if player:
             player.body.angle -= PLAYER_ROTATION
 
     def shoot(self, player_id):
+        """
+        Initiates a shooting action for the specified player.
+        
+        Checks for spawn protection; if allowed, spawns a projectile in front of the player.
+        
+        Args:
+            player_id (str): The identifier of the player who is firing.
+        """
         player = self.players.get(player_id)
         if player:
-            # *** NEU: Spawn-Schutz Prüfung ***
+            # Prevent shooting when spawn protection is active.
             if time.time() < player.spawn_protection_until:
                 print(f"Player {player_id} cannot shoot during spawn protection.")
-                return # Schießen verhindern
+                return
 
-            # --- Bestehende Logik zum Schießen ---
             player_angle_rad = player.body.angle
             offset_distance = player.radius + PROJECTILE_RADIUS + 1
             start_offset_x = math.cos(player_angle_rad) * offset_distance
             start_offset_y = math.sin(player_angle_rad) * offset_distance
             start_pos = player.body.position + pymunk.Vec2d(start_offset_x, start_offset_y)
 
-            # Übergebe die Farbe des Spielers an das Projektil
+            # Use the player's color for the projectile.
             projectile = Projectile(
                 position=start_pos,
                 angle_rad=player.body.angle,
                 owner=player,
-                color=player.color, # *** NEU: Spielerfarbe übergeben ***
+                color=player.color,
                 game_world=self
             )
             self.increment_shot_count()
             print(f"Shot fired by {player_id}! Total shots: {self.shot_count}")
 
     def increment_shot_count(self):
+        """
+        Increments the shot counter, tracking the number of projectiles fired.
+        """
         self.shot_count += 1
 
     def update(self, dt):
+        """
+        Updates the physics simulation and game objects.
+        
+        Steps the physics engine, updates angular velocities, and calls each object's update method.
+        
+        Args:
+            dt (float): Delta time since the last update.
+        """
         self.space.step(dt)
         for player in self.players.values():
             player.body.angular_velocity *= 1 - 0.1 * PHYSICS_DT
@@ -213,15 +293,33 @@ class GameWorld:
                 shape.sprite_ref.update(dt)
 
     async def _run_physics_loop(self, dt):
+        """
+        Runs the continuous physics simulation loop asynchronously.
+        
+        This method is intended to be run as an asyncio task. It repeatedly calls update()
+        and then sleeps for the given delta time.
+        
+        Args:
+            dt (float): Delta time between physics updates.
+        """
         while self.is_running:
             self.update(dt)
             await asyncio.sleep(dt)
 
     def start_physics_engine(self, dt=PHYSICS_DT):
+        """
+        Starts the physics engine in an asynchronous loop.
+        
+        Attempts to retrieve the current event loop or creates a new one if necessary 
+        (running it in a separate daemon thread). Schedules the physics loop as a task.
+        
+        Args:
+            dt (float, optional): Delta time between physics updates. Defaults to PHYSICS_DT.
+        """
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            # Kein laufender Event Loop – erstelle einen neuen und starte ihn in einem Daemon-Thread
+            # No running event loop; create a new one and run it in a daemon thread.
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             threading.Thread(target=loop.run_forever, daemon=True).start()
@@ -229,6 +327,9 @@ class GameWorld:
         self._physics_task = loop.create_task(self._run_physics_loop(dt))
 
     def stop_physics_engine(self):
+        """
+        Stops the physics engine loop and cancels the associated asyncio task.
+        """
         if self.is_running:
             self.is_running = False
             if self._physics_task:
@@ -236,6 +337,12 @@ class GameWorld:
                 self._physics_task = None
 
     def to_dict(self):
+        """
+        Serializes the current game state to a dictionary.
+        
+        Returns:
+            dict: Contains player states, object states (excluding players), and shot count.
+        """
         return {
             "players": [
                 {
@@ -251,9 +358,16 @@ class GameWorld:
 
     def get_relative_state_for_player(self, player_id):
         """
-        Gibt den Zustand relativ zu einem bestimmten Spieler zurück,
-        einschließlich der Lebenszahl und aller Objekte (inkl. anderer Spieler)
-        in einem bestimmten Radius.
+        Returns a relative view of the game state from a player's perspective.
+        
+        The returned state includes the player's health, velocity, angular velocity, and nearby objects 
+        (players, obstacles, projectiles) within a specified scanning radius.
+        
+        Args:
+            player_id (str): The identifier of the player.
+        
+        Returns:
+            dict or None: The relative game state or None if the player is not found.
         """
         player = self.players.get(player_id)
         if not player:
@@ -264,16 +378,12 @@ class GameWorld:
         player_vel = player.body.velocity
         player_angular_vel = player.body.angular_velocity
         player_health = player.health
-        radius = SCANNING_RADIUS # Aus settings.py
+        radius = SCANNING_RADIUS
 
         nearby_objects_relative = []
         
-        # Iteriere durch alle Objekte UND alle anderen Spieler
-        # Kombiniere die Listen oder iteriere separat
-        
-        # 1. Iteriere durch 'objects' (Hindernisse, Projektile)
+        # Process non-player objects (obstacles, projectiles).
         for obj in self.objects:
-            # Spieler selbst und Objekte ohne Body überspringen
             if obj is player or not hasattr(obj, 'body'):
                 continue
 
@@ -293,21 +403,18 @@ class GameWorld:
                     obj_type = "obstacle"
                 elif isinstance(obj, Projectile):
                     obj_type = "projectile"
-                # Spieler werden in der nächsten Schleife behandelt
 
-                if obj_type != "unknown": # Nur bekannte Typen hinzufügen
+                if obj_type != "unknown":
                     nearby_objects_relative.append({
                         "type": obj_type,
                         "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
                         "relative_velocity": [relative_vel_rotated.x, relative_vel_rotated.y],
                         "distance": distance,
-                        # Optional: Farbe des Projektils hinzufügen
                         "color": getattr(obj, 'color', None) if obj_type == "projectile" else None
                     })
 
-        # 2. Iteriere durch 'players' (andere Spieler)
+        # Process other players.
         for other_pid, other_player in self.players.items():
-            # Überspringe den Spieler selbst
             if other_pid == player_id:
                 continue
 
@@ -327,12 +434,8 @@ class GameWorld:
                     "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
                     "relative_velocity": [relative_vel_rotated.x, relative_vel_rotated.y],
                     "distance": distance,
-                    "color": other_player.color, # Farbe des anderen Spielers
-                    # Optional: ID oder Health des anderen Spielers hinzufügen?
-                    # "id": other_pid,
-                    # "health": other_player.health # Ist Health "scannbar"?
+                    "color": other_player.color,
                 })
-
 
         return {
             "player_id": player_id,
@@ -343,68 +446,69 @@ class GameWorld:
         }
 
     def run_visualizer(self):
+        """
+        Runs the Pygame visualizer which is used for debugging and visualization.
+        
+        This function initializes Pygame, creates the window, processes events, updates 
+        all sprites, draws static elements (like obstacles), displays health bars, and updates the screen.
+        The loop runs until the window is closed.
+        """
         pygame.init()
         screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Game Visualizer")
         clock = pygame.time.Clock()
 
-        # Statischen Hintergrund erstellen (optional)
+        # Create a static background surface with obstacles.
         background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        background.fill((0, 0, 0)) # Schwarzer Hintergrund
+        background.fill((0, 0, 0))  # Black background
         static_sprites = pygame.sprite.Group()
         for obj in self.objects:
-             if isinstance(obj, CircleObstacle):
-                 static_sprites.add(obj)
+            if isinstance(obj, CircleObstacle):
+                static_sprites.add(obj)
         static_sprites.draw(background)
 
         running = True
         while running:
-            screen.blit(background, (0, 0)) # Zeichne Hintergrund mit statischen Elementen
+            screen.blit(background, (0, 0))
 
-            # Erstelle die Gruppe der aktuell aktiven Sprites
+            # Create a sprite group for currently active sprites.
             current_sprites = pygame.sprite.Group()
             for player in self.players.values():
-                 current_sprites.add(player)
+                current_sprites.add(player)
             for obj in self.objects:
-                 if isinstance(obj, Projectile):
-                     current_sprites.add(obj)
+                if isinstance(obj, Projectile):
+                    current_sprites.add(obj)
 
-            # Aktualisiere Sprites (Position, Rotation, Transparenz für Spawn-Schutz)
+            # Update sprites (position, rotation, spawn protection transparency).
             dt = clock.tick(FPS) / 1000.0
             current_sprites.update(dt)
-
-            # Zeichne alle Sprites (Spieler, Projektile etc.)
             current_sprites.draw(screen)
 
-            # *** Gesundheitsleisten für alle Spieler zeichnen (Effizient) ***
-            bar_width = 30  # Breite der Leiste
-            bar_height = 5   # Höhe der Leiste
-            bar_offset_y = 5 # Abstand unter dem Spieler
-            health_color = (0, 255, 0) # Grün für Gesundheit
-            lost_health_color = (255, 0, 0) # Rot für verlorene Gesundheit
-            border_color = (255, 255, 255) # Weißer Rand
+            # Draw health bars for players.
+            bar_width = 30   # Width of the health bar
+            bar_height = 5   # Height of the health bar
+            bar_offset_y = 5 # Vertical offset below the player sprite
+            health_color = (0, 255, 0)        # Green for remaining health
+            lost_health_color = (255, 0, 0)     # Red for lost health
+            border_color = (255, 255, 255)      # White border
 
             for player in self.players.values():
-                # Position unter dem Spieler-Rechteck zentriert
-                # player.rect wird in player.update() aktualisiert
                 bar_x = player.rect.centerx - bar_width // 2
                 bar_y = player.rect.bottom + bar_offset_y
+                health_percentage = max(0, player.health / PLAYER_START_HEALTH)
 
-                # Berechne den Füllstand (Prozentsatz)
-                health_percentage = max(0, player.health / PLAYER_START_HEALTH) # Sicherstellen >= 0
-
-                # Zeichne Hintergrund (verlorene Gesundheit)
+                # Draw background (lost health).
                 background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
                 pygame.draw.rect(screen, lost_health_color, background_rect)
 
-                # Zeichne Vordergrund (aktuelle Gesundheit)
+                # Draw current health overlay.
                 current_bar_width = int(bar_width * health_percentage)
                 if current_bar_width > 0:
                     health_rect = pygame.Rect(bar_x, bar_y, current_bar_width, bar_height)
                     pygame.draw.rect(screen, health_color, health_rect)
 
-                # Optional: Zeichne Rahmen
-                pygame.draw.rect(screen, border_color, background_rect, 1) # Dicke 1
+                # Draw the border.
+                pygame.draw.rect(screen, border_color, background_rect, 1)
 
             pygame.display.flip()
 
@@ -414,6 +518,6 @@ class GameWorld:
 
         pygame.quit()
 
-# Erstelle globale Instanz nach Initialisierung:
+# Create global instance after initialization:
 game_world_instance = GameWorld(SCREEN_WIDTH, SCREEN_HEIGHT)
 game_world_instance.initialize_world()
