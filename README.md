@@ -42,7 +42,7 @@ The system consists of three main components:
     *   Renders the game graphically.
     *   Launched by `main.py` in the main thread after the server starts.
 3.  **Agent (Client):**
-    *   Example implementation: [`dummy_agent.py`](c:\_Bibliothek\UPC_PyGame\dummy_agent.py).
+    *   Example implementation: [`dummy_agent.py`](.\dummy_agent.py).
     *   Connects to the FastAPI server via HTTP requests (`requests` library).
     *   Sends control commands (thrust, rotate, shoot) to the API.
     *   Receives relative game state information from the API.
@@ -55,7 +55,7 @@ The system consists of three main components:
     git clone -b max git@github.com:DaniFabi24/UPC_PyGame.git
     ```
 2.  **Create and Activate a Virtual Environment:**
-    Open your terminal in the project root (where [`requirements.txt`](c:\_Bibliothek\UPC_PyGame\requirements.txt) is located) and run:
+    Open your terminal in the project root (where [`requirements.txt`](.\requirements.txt) is located) and run:
     ```bash
     # Using python's built-in venv module
     python -m venv venv
@@ -100,7 +100,7 @@ Use the following keys in the Pygame window created by `dummy_agent.py` to contr
 
 ## API Overview
 
-The FastAPI server exposes the following key endpoints for agent interaction (base URL defined in [`src/settings.py`](c:\_Bibliothek\UPC_PyGame\src\settings.py)):
+The FastAPI server exposes the following key endpoints for agent interaction (base URL defined in [`src/settings.py`](.\src\settings.py)):
 
 *   `POST /connect`: Connects a new agent, returns a unique `player_id`.
 *   `POST /disconnect/{player_id}`: Disconnects the specified player.
@@ -111,11 +111,11 @@ The FastAPI server exposes the following key endpoints for agent interaction (ba
 *   `POST /player/{player_id}/rotate_right`: Applies right rotation torque.
 *   `POST /player/{player_id}/shoot`: Fires a projectile.
 
-*(Refer to [`src/api/api_endpoints.py`](c:\_Bibliothek\UPC_PyGame\src\api\api_endpoints.py) for implementation details)*
+*(Refer to [`src/api/api_endpoints.py`](.\src\api\api_endpoints.py) for implementation details)*
 
 ## Configuration
 
-Key game parameters can be adjusted in [`src/settings.py`](c:\_Bibliothek\UPC_PyGame\src\settings.py), including:
+Key game parameters can be adjusted in [`src/settings.py`](.\src\settings.py), including:
 
 *   API host and port.
 *   Screen dimensions and FPS.
@@ -126,7 +126,7 @@ Key game parameters can be adjusted in [`src/settings.py`](c:\_Bibliothek\UPC_Py
 ## Competition Instructions
 
 *   **Objective:** Be the last player surviving in the arena. This is a free-for-all deathmatch.
-*   **Agent Development:** Modify [`dummy_agent.py`](c:\_Bibliothek\UPC_PyGame\dummy_agent.py) or create your own agent script that interacts with the game server via the defined HTTP API.
+*   **Agent Development:** Modify [`dummy_agent.py`](.\dummy_agent.py) or create your own agent script that interacts with the game server via the defined HTTP API.
 *   **Focus:** Your agent should make decisions based on the relative state information received from the `/player/{player_id}/state` endpoint.
 *   **Code Standards:** Ensure your agent code is readable and connects/interacts correctly with the provided server API.
 *   **Evaluation:** Agents will be evaluated based on functionality (correct interaction), performance (efficiency in processing state and reacting), survival time, and potentially strategic innovation (use of environment, aiming).
