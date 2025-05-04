@@ -40,9 +40,15 @@ class Triangle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=position)
 
     def _create_base_image(self):
-        self.original_image.fill((0, 0, 0, 0))  # Transparenter Hintergrund
+        # Erstelle eine quadratische Surface, die groß genug ist, um das rotierte Dreieck aufzunehmen
+        # Der Durchmesser des Umkreises eines gleichseitigen Dreiecks ist 2*Radius
+        # Die Diagonale eines Quadrats, das das rotierte Dreieck umschließt, ist etwas größer
+        size = int(self.radius * 2 * 1.5) # Sicherheitsfaktor
+        self.original_image = pygame.Surface((size, size), pygame.SRCALPHA)
+        self.original_image.fill((0, 0, 0, 0)) # Transparenter Hintergrund
+
         # Berechne die Punkte des Dreiecks relativ zum Mittelpunkt der Surface
-        center_x, center_y = self.radius, self.radius
+        center_x, center_y = size // 2, size // 2 # Mittelpunkt der größeren Surface
         points = [
             (center_x + self.radius * math.cos(math.radians(deg)),
              center_y - self.radius * math.sin(math.radians(deg)))
@@ -53,7 +59,7 @@ class Triangle(pygame.sprite.Sprite):
         # Füge einen Indikator an der Spitze hinzu (bei 0 Grad)
         tip_x = center_x + self.radius * math.cos(math.radians(0))
         tip_y = center_y - self.radius * math.sin(math.radians(0))
-        indicator_color = (255, 0, 0)  # Rot als Indikatorfarbe
+        indicator_color = (255, 255, 255)  # *** Weiß als Indikatorfarbe ***
         indicator_radius = 3
         pygame.draw.circle(self.original_image, indicator_color, (int(tip_x), int(tip_y)), indicator_radius)
 
@@ -148,9 +154,10 @@ class CircleObstacle(pygame.sprite.Sprite):
         }
 
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, position, angle_rad, owner, color=PROJECTILE_COLOR, radius=PROJECTILE_RADIUS, speed=PROJECTILE_SPEED, game_world=None):
+    # Füge 'color' als Parameter hinzu und entferne den Default aus settings
+    def __init__(self, position, angle_rad, owner, color, radius=PROJECTILE_RADIUS, speed=PROJECTILE_SPEED, game_world=None):
         super().__init__()
-        self.color = color
+        self.color = color # *** NEU: Farbe speichern ***
         self.radius = radius
         self.game_world = game_world
         self.lifetime = PROJECTILE_LIFETIME_SECONDS # Seconds until the projectile is removed
@@ -186,9 +193,10 @@ class Projectile(pygame.sprite.Sprite):
             game_world.space.add(self.body, self.shape)
             game_world.add_object(self) # Add to the game world's object list
 
-        # Create the visual representation
+        # Create the visual representation using the passed color
         self.image = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-        pygame.draw.circle(self.image, color, (radius, radius), radius)
+        # *** Nutze die übergebene Farbe ***
+        pygame.draw.circle(self.image, self.color, (radius, radius), radius)
         self.rect = self.image.get_rect(center=position)
 
     def update(self, dt):
@@ -234,7 +242,7 @@ def player_hit_obstacle(arbiter, space, data):
     # Sicherstellen, dass es sich um den Spieler handelt und er Schaden nehmen kann
     if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
         player_sprite = player_shape.sprite_ref
-        player_sprite.take_damage(OBSTACLE_DAMAGE) # Schaden zufügen
+        # player_sprite.take_damage(OBSTACLE_DAMAGE)
         game_world.player_collisions += 1 # Kollisionen weiter zählen
         print(f"Player collided with obstacle. Health: {player_sprite.health}")
     else:
@@ -242,7 +250,7 @@ def player_hit_obstacle(arbiter, space, data):
          player_shape, obstacle_shape = obstacle_shape, player_shape
          if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
              player_sprite = player_shape.sprite_ref
-             player_sprite.take_damage(OBSTACLE_DAMAGE)
+             # player_sprite.take_damage(OBSTACLE_DAMAGE)
              game_world.player_collisions += 1
              print(f"Player collided with obstacle (reversed shapes). Health: {player_sprite.health}")
 

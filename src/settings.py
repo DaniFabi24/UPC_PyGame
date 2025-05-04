@@ -10,9 +10,9 @@ FPS = 60
 # Bewegungsparameter für den Spieler
 PLAYER_THRUST   =   5          # festgelegter Thrust-Wert
 PLAYER_ROTATION =   0.05     # festgelegter Rotationswert
-PLAYER_MAX_SPEED =  50      # maximale Geschwindigkeit
+PLAYER_MAX_SPEED =  40      # maximale Geschwindigkeit
 PHYSICS_DT = 1/FPS          # Zeitintervall für Physik-Updates
-PROJECTILE_SPEED = 300
+PROJECTILE_SPEED = 200
 PROJECTILE_RADIUS = 4
 PROJECTILE_COLOR = (255, 255, 0)  # Yellow
 PROJECTILE_LIFETIME_SECONDS = 3.0  # Remove after 3 seconds
@@ -20,7 +20,7 @@ PROJECTILE_LIFETIME_SECONDS = 3.0  # Remove after 3 seconds
 # Player Settings
 PLAYER_START_HEALTH = 5 # *** Geändert auf 5 Leben ***
 OBSTACLE_DAMAGE = 1 # Schaden pro Kollision mit einem Hindernis (ggf. anpassen)
-SCANNING_RADIUS = 100 # Radius des Scanners (in Pixeln)
+SCANNING_RADIUS = 150 # Radius des Scanners (in Pixeln)
 
 # Projectile Settings
 PROJECTILE_DAMAGE = 1 # *** NEU: Schaden pro Projektiltreffer ***

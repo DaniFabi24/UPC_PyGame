@@ -9,6 +9,20 @@ import time
 from .game_objects import *
 from ..settings import *
 
+PLAYER_COLORS = [
+    (255, 0, 0),     # Red
+    (0, 191, 255),   # Deep Sky Blue (Helleres Blau)
+    (50, 205, 50),   # Lime Green (Etwas dunkler, aber immer noch hell)
+    (255, 255, 0),   # Yellow
+    (0, 255, 255),   # Cyan
+    (255, 0, 255),   # Magenta
+    (255, 165, 0),   # Orange
+    (238, 130, 238), # Violet (Helleres Lila)
+    (255, 255, 255), # White
+    (192, 192, 192)  # Silver (Helleres Grau)
+]
+NEXT_COLOR_INDEX = 0 # Globale Variable oder besser in GameWorld
+
 class GameWorld:
     def __init__(self, width, height):
         self.width = width
@@ -21,10 +35,11 @@ class GameWorld:
         self.player_collisions = 0
         self._physics_task = None
         self.is_running = False
+        self.next_color_index = 0 # Index für die nächste Spielerfarbe
         self.add_borders()
         
     def add_player(self):
-        """Erstellt einen neuen Spieler an einer kollisionsfreien Position."""
+        """Erstellt einen neuen Spieler mit einer eindeutigen Farbe."""
         player_id = str(uuid.uuid4())
         max_attempts = 10
         safe_spawn_pos = None
@@ -71,10 +86,15 @@ class GameWorld:
                 break
 
         if safe_spawn_pos:
-            new_player = Triangle(safe_spawn_pos, game_world=self)
+            # Wähle die nächste Farbe aus der Liste
+            player_color = PLAYER_COLORS[self.next_color_index % len(PLAYER_COLORS)]
+            self.next_color_index += 1 # Erhöhe den Index für den nächsten Spieler
+
+            # Übergebe die Farbe an den Triangle Konstruktor
+            new_player = Triangle(safe_spawn_pos, color=player_color, game_world=self)
             new_player.player_id = player_id
             self.players[player_id] = new_player
-            print(f"Player added with ID: {player_id} at {safe_spawn_pos}. Spawn protection active until {new_player.spawn_protection_until:.2f}")
+            print(f"Player added with ID: {player_id} at {safe_spawn_pos} with color {player_color}. Spawn protection active until {new_player.spawn_protection_until:.2f}")
             print(f"Current players in dict after add: {list(self.players.keys())}")
             return player_id
         else:
@@ -170,10 +190,12 @@ class GameWorld:
             start_offset_y = math.sin(player_angle_rad) * offset_distance
             start_pos = player.body.position + pymunk.Vec2d(start_offset_x, start_offset_y)
 
+            # Übergebe die Farbe des Spielers an das Projektil
             projectile = Projectile(
                 position=start_pos,
-                angle_rad=player_angle_rad,
+                angle_rad=player.body.angle,
                 owner=player,
+                color=player.color, # *** NEU: Spielerfarbe übergeben ***
                 game_world=self
             )
             self.increment_shot_count()
@@ -230,7 +252,8 @@ class GameWorld:
     def get_relative_state_for_player(self, player_id):
         """
         Gibt den Zustand relativ zu einem bestimmten Spieler zurück,
-        einschließlich der Lebenszahl und aller Objekte in einem bestimmten Radius.
+        einschließlich der Lebenszahl und aller Objekte (inkl. anderer Spieler)
+        in einem bestimmten Radius.
         """
         player = self.players.get(player_id)
         if not player:
@@ -241,10 +264,16 @@ class GameWorld:
         player_vel = player.body.velocity
         player_angular_vel = player.body.angular_velocity
         player_health = player.health
-        radius = SCANNING_RADIUS
+        radius = SCANNING_RADIUS # Aus settings.py
 
         nearby_objects_relative = []
+        
+        # Iteriere durch alle Objekte UND alle anderen Spieler
+        # Kombiniere die Listen oder iteriere separat
+        
+        # 1. Iteriere durch 'objects' (Hindernisse, Projektile)
         for obj in self.objects:
+            # Spieler selbst und Objekte ohne Body überspringen
             if obj is player or not hasattr(obj, 'body'):
                 continue
 
@@ -264,15 +293,46 @@ class GameWorld:
                     obj_type = "obstacle"
                 elif isinstance(obj, Projectile):
                     obj_type = "projectile"
-                elif isinstance(obj, Triangle):
-                    obj_type = "other_player"
+                # Spieler werden in der nächsten Schleife behandelt
+
+                if obj_type != "unknown": # Nur bekannte Typen hinzufügen
+                    nearby_objects_relative.append({
+                        "type": obj_type,
+                        "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
+                        "relative_velocity": [relative_vel_rotated.x, relative_vel_rotated.y],
+                        "distance": distance,
+                        # Optional: Farbe des Projektils hinzufügen
+                        "color": getattr(obj, 'color', None) if obj_type == "projectile" else None
+                    })
+
+        # 2. Iteriere durch 'players' (andere Spieler)
+        for other_pid, other_player in self.players.items():
+            # Überspringe den Spieler selbst
+            if other_pid == player_id:
+                continue
+
+            other_player_pos = other_player.body.position
+            distance = player_pos.get_distance(other_player_pos)
+
+            if distance <= radius:
+                delta_pos = other_player_pos - player_pos
+                relative_pos_rotated = delta_pos.rotated(-player_angle_rad)
+
+                other_player_vel = other_player.body.velocity
+                delta_vel = other_player_vel - player_vel
+                relative_vel_rotated = delta_vel.rotated(-player_angle_rad)
 
                 nearby_objects_relative.append({
-                    "type": obj_type,
+                    "type": "other_player",
                     "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
                     "relative_velocity": [relative_vel_rotated.x, relative_vel_rotated.y],
                     "distance": distance,
+                    "color": other_player.color, # Farbe des anderen Spielers
+                    # Optional: ID oder Health des anderen Spielers hinzufügen?
+                    # "id": other_pid,
+                    # "health": other_player.health # Ist Health "scannbar"?
                 })
+
 
         return {
             "player_id": player_id,
@@ -288,15 +348,12 @@ class GameWorld:
         pygame.display.set_caption("Game Visualizer")
         clock = pygame.time.Clock()
 
-        # Erzeuge einen statischen Hintergrund (optional, kann Performance verbessern)
+        # Statischen Hintergrund erstellen (optional)
         background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        background.fill((0, 0, 0))
+        background.fill((0, 0, 0)) # Schwarzer Hintergrund
         static_sprites = pygame.sprite.Group()
-        # Finde statische Objekte (z.B. Hindernisse) und zeichne sie einmal auf den Hintergrund
-        # WICHTIG: Dies setzt voraus, dass Hindernisse nicht zur Laufzeit hinzugefügt/entfernt werden.
-        # Wenn doch, muss der Hintergrund neu gezeichnet werden.
         for obj in self.objects:
-             if isinstance(obj, CircleObstacle): # Nur statische Hindernisse
+             if isinstance(obj, CircleObstacle):
                  static_sprites.add(obj)
         static_sprites.draw(background)
 
@@ -304,32 +361,59 @@ class GameWorld:
         while running:
             screen.blit(background, (0, 0)) # Zeichne Hintergrund mit statischen Elementen
 
-            # Erstelle die Gruppe der *aktuell* aktiven Sprites für diesen Frame
-            # Dies stellt sicher, dass entfernte Objekte nicht mehr gezeichnet werden.
+            # Erstelle die Gruppe der aktuell aktiven Sprites
             current_sprites = pygame.sprite.Group()
-            # Füge alle Spieler hinzu, die noch im Dictionary sind
             for player in self.players.values():
                  current_sprites.add(player)
-            # Füge alle anderen Objekte hinzu (z.B. Projektile)
             for obj in self.objects:
-                 if isinstance(obj, Projectile): # Nur dynamische Objekte hier hinzufügen
+                 if isinstance(obj, Projectile):
                      current_sprites.add(obj)
 
-            # Zeichne alle aktuellen Sprites
+            # Aktualisiere Sprites (Position, Rotation, Transparenz für Spawn-Schutz)
+            dt = clock.tick(FPS) / 1000.0
+            current_sprites.update(dt)
+
+            # Zeichne alle Sprites (Spieler, Projektile etc.)
             current_sprites.draw(screen)
+
+            # *** Gesundheitsleisten für alle Spieler zeichnen (Effizient) ***
+            bar_width = 30  # Breite der Leiste
+            bar_height = 5   # Höhe der Leiste
+            bar_offset_y = 5 # Abstand unter dem Spieler
+            health_color = (0, 255, 0) # Grün für Gesundheit
+            lost_health_color = (255, 0, 0) # Rot für verlorene Gesundheit
+            border_color = (255, 255, 255) # Weißer Rand
+
+            for player in self.players.values():
+                # Position unter dem Spieler-Rechteck zentriert
+                # player.rect wird in player.update() aktualisiert
+                bar_x = player.rect.centerx - bar_width // 2
+                bar_y = player.rect.bottom + bar_offset_y
+
+                # Berechne den Füllstand (Prozentsatz)
+                health_percentage = max(0, player.health / PLAYER_START_HEALTH) # Sicherstellen >= 0
+
+                # Zeichne Hintergrund (verlorene Gesundheit)
+                background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+                pygame.draw.rect(screen, lost_health_color, background_rect)
+
+                # Zeichne Vordergrund (aktuelle Gesundheit)
+                current_bar_width = int(bar_width * health_percentage)
+                if current_bar_width > 0:
+                    health_rect = pygame.Rect(bar_x, bar_y, current_bar_width, bar_height)
+                    pygame.draw.rect(screen, health_color, health_rect)
+
+                # Optional: Zeichne Rahmen
+                pygame.draw.rect(screen, border_color, background_rect, 1) # Dicke 1
 
             pygame.display.flip()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            
-            clock.tick(FPS)
 
         pygame.quit()
 
 # Erstelle globale Instanz nach Initialisierung:
 game_world_instance = GameWorld(SCREEN_WIDTH, SCREEN_HEIGHT)
 game_world_instance.initialize_world()
-
-#Dummy zum Testen von git!
