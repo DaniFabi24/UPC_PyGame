@@ -4,6 +4,8 @@ import threading
 import asyncio
 import uuid
 import math
+import random
+import time
 from .game_objects import *
 from ..settings import *
 
@@ -22,15 +24,62 @@ class GameWorld:
         self.add_borders()
         
     def add_player(self):
-        """Erstellt einen neuen Spieler, weist eine ID zu und gibt die ID zurück."""
+        """Erstellt einen neuen Spieler an einer kollisionsfreien Position."""
         player_id = str(uuid.uuid4())
-        start_pos = [self.width / 2, self.height / 2] # Oder zufällige Position
-        new_player = Triangle(start_pos, game_world=self)
-        new_player.player_id = player_id # ID am Objekt speichern (optional, aber nützlich)
-        self.players[player_id] = new_player
-        self.add_object(new_player) # Fügt auch zur Physik-Engine hinzu
-        print(f"Player added with ID: {player_id}")
-        return player_id
+        max_attempts = 10
+        safe_spawn_pos = None
+        player_radius = 15
+
+        for attempt in range(max_attempts):
+            # ... (Positionsauswahl wie zuvor) ...
+            if attempt == 0:
+                potential_pos = pymunk.Vec2d(self.width / 2, self.height / 2)
+            else:
+                pad = player_radius + 10
+                potential_pos = pymunk.Vec2d(
+                    random.uniform(pad, self.width - pad),
+                    random.uniform(pad, self.height - pad)
+                )
+
+            # ... (Erstellung von temp_body und temp_shape wie zuvor) ...
+            temp_body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
+            temp_body.position = potential_pos
+            temp_shape = pymunk.Poly(temp_body, [
+                (player_radius, 0),
+                (-player_radius, player_radius),
+                (-player_radius, -player_radius)
+            ])
+            temp_shape.collision_type = 1
+
+            # Prüfe auf Kollisionen mit bestehenden Shapes im Space
+            # *** Relevant sind Hindernisse (Typ 2) UND andere Spieler (Typ 1) ***
+            query_info = self.space.shape_query(temp_shape)
+
+            collision_found = False
+            colliding_type = None
+            for info in query_info:
+                # Prüfe, ob die Kollision mit einem Hindernis (Typ 2) oder Spieler (Typ 1) stattfindet
+                if info.shape and info.shape.collision_type in [1, 2]: # *** Prüfung auf Typ 1 und 2 ***
+                     collision_found = True
+                     colliding_type = info.shape.collision_type
+                     print(f"Spawn attempt {attempt+1} at {potential_pos} failed: Collision with type {colliding_type}.")
+                     break # Kollision gefunden, nächste Position versuchen
+
+            if not collision_found:
+                safe_spawn_pos = potential_pos
+                print(f"Spawn attempt {attempt+1}: Found safe position at {safe_spawn_pos}")
+                break
+
+        if safe_spawn_pos:
+            new_player = Triangle(safe_spawn_pos, game_world=self)
+            new_player.player_id = player_id
+            self.players[player_id] = new_player
+            print(f"Player added with ID: {player_id} at {safe_spawn_pos}. Spawn protection active until {new_player.spawn_protection_until:.2f}")
+            print(f"Current players in dict after add: {list(self.players.keys())}")
+            return player_id
+        else:
+            print(f"Error: Could not find a safe spawn position for player after {max_attempts} attempts.")
+            return None
 
     def remove_player(self, player_id):
         """Entfernt einen Spieler anhand seiner ID, indem die Methode des Spielers aufgerufen wird."""
@@ -66,9 +115,19 @@ class GameWorld:
             self.space.add(border)
 
     def initialize_world(self):
-        self.add_object(CircleObstacle([200, 200], 30, game_world=self))
-        self.add_object(CircleObstacle([600, 400], 50, game_world=self))
-        self.add_object(CircleObstacle([600, 300], 70, game_world=self))
+        # Add obstacles to create an arena-like environment
+        arena_obstacles = [
+            CircleObstacle([150, 150], 40, game_world=self),
+            CircleObstacle([650, 150], 40, game_world=self),
+            CircleObstacle([150, 450], 40, game_world=self),
+            CircleObstacle([650, 450], 40, game_world=self),
+            CircleObstacle([400, 150], 30, game_world=self),
+            CircleObstacle([400, 450], 30, game_world=self),
+            CircleObstacle([250, 300], 50, game_world=self),
+            CircleObstacle([550, 300], 50, game_world=self),
+        ]
+        for obstacle in arena_obstacles:
+            self.add_object(obstacle)
         from .game_objects import setup_collision_handlers
         setup_collision_handlers(self.space, self)
 
@@ -99,6 +158,12 @@ class GameWorld:
     def shoot(self, player_id):
         player = self.players.get(player_id)
         if player:
+            # *** NEU: Spawn-Schutz Prüfung ***
+            if time.time() < player.spawn_protection_until:
+                print(f"Player {player_id} cannot shoot during spawn protection.")
+                return # Schießen verhindern
+
+            # --- Bestehende Logik zum Schießen ---
             player_angle_rad = player.body.angle
             offset_distance = player.radius + PROJECTILE_RADIUS + 1
             start_offset_x = math.cos(player_angle_rad) * offset_distance
@@ -112,7 +177,7 @@ class GameWorld:
                 game_world=self
             )
             self.increment_shot_count()
-            print(f"Shot fired! Total shots: {self.shot_count}")
+            print(f"Shot fired by {player_id}! Total shots: {self.shot_count}")
 
     def increment_shot_count(self):
         self.shot_count += 1

@@ -2,7 +2,7 @@ import pygame
 import requests
 import sys
 import json # Importiere json zum hübschen Drucken
-from ..settings import API_URL # Stelle sicher, dass API_URL korrekt ist
+from src.settings import API_URL # Stelle sicher, dass API_URL korrekt ist
 
 class Agent:
     def __init__(self):

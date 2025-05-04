@@ -1,6 +1,7 @@
 import pygame
 import math
 import pymunk
+import time
 from ..settings import *
 
 class Triangle(pygame.sprite.Sprite):
@@ -10,6 +11,10 @@ class Triangle(pygame.sprite.Sprite):
         self.radius = 15
         self.game_world = game_world
         self.health = PLAYER_START_HEALTH # *** NEU: Leben hinzufügen ***
+        self.player_id = None # Wird von GameWorld gesetzt
+        # *** NEU: Spawn-Schutz Timer ***
+        self.spawn_protection_duration = 3.0 # Sekunden
+        self.spawn_protection_until = time.time() + self.spawn_protection_duration
         mass = 1
         moment = pymunk.moment_for_poly(mass, [
             (self.radius, 0),
@@ -60,15 +65,27 @@ class Triangle(pygame.sprite.Sprite):
         rotated_image = pygame.transform.rotate(self.original_image, -self.angle)
         self.rect = rotated_image.get_rect(center=self.rect.center)
         self.image = rotated_image
+        # *** Optional: Visuelles Feedback für Spawn-Schutz ***
+        if time.time() < self.spawn_protection_until:
+            # Lässt das Sprite leicht transparent erscheinen
+            alpha = 128 # 0=transparent, 255=opak
+            self.image.set_alpha(alpha)
+        else:
+            # Normale Deckkraft wiederherstellen
+            self.image.set_alpha(255)
 
     def take_damage(self, amount):
         """Reduziert die Lebenspunkte des Spielers."""
+        # *** NEU: Spawn-Schutz Prüfung ***
+        if time.time() < self.spawn_protection_until:
+            print(f"Player {self.player_id} is spawn protected. Damage ignored.")
+            return # Keinen Schaden nehmen
+
         self.health -= amount
-        print(f"Player took {amount} damage. Current health: {self.health}")
+        print(f"Player {self.player_id} took {amount} damage. Current health: {self.health}")
         if self.health <= 0:
-            print("Player has been destroyed!")
-            # Hier könnte Logik zum Entfernen des Spielers oder Beenden des Spiels hinzukommen
-            self.remove_from_world() # Beispiel: Spieler entfernen
+            print(f"Player {self.player_id} destroyed!")
+            self.remove_from_world() # Spieler entfernen
 
     def remove_from_world(self):
         """Entfernt den Spieler aus der Spielwelt und allen relevanten Sammlungen."""
