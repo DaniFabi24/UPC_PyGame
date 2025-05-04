@@ -137,5 +137,5 @@ Key game parameters can be adjusted in [`src/settings.py`](c:\_Bibliothek\UPC_Py
 
 Feel free to report issues or suggest improvements using the templates provided in the `.github` directory:
 
-*   **Issues:** [`general_issue.md`](/.github/DISCUSSIONS_TEMPLATE/general_issue.md)
+*   **Issues:** [`general_issue.md`](/.github/ISSUE_TEMPLATE/general_issue.md)
 *   **Discussions:** [`general_discussion.md`](.github/DISCUSSIONS_TEMPLATE/general_discussion.md)
