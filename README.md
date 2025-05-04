@@ -1,81 +1,141 @@
-# UPC_PyGame
+# UPC_PyGame Simulation
 
-UPC_PyGame is a 2D game simulation developed as part of the Python course at UPC_ETSEIB. It combines a FastAPI server managing the physics engine and game logic with a Pygame visualizer and a dummy agent for testing. Although the project may not be super polished, it is a complete system for demonstration and competition purposes.
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Framework](https://img.shields.io/badge/Framework-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
+[![Physics](https://img.shields.io/badge/Physics-Pymunk-orange.svg)](http://www.pymunk.org/)
+[![Graphics](https://img.shields.io/badge/Graphics-Pygame-red.svg)](https://www.pygame.org/)
 
-## Demo Launch
+## Overview
 
-To launch the entire system, follow these steps:
-1. **Start the API Server and Physics Engine:**  
-   Run the `main.py` file. This will start the FastAPI server (using Uvicorn) in a background thread. The physics engine is initialized via FastAPI's startup event.
-2. **Run the Dummy Agent:**  
-   A dummy agent is provided in `dummy_agent.py`. It connects to the server, sends control actions (such as moving, rotating, or shooting), and polls for the game state.
-3. **Open the Visualizer:**  
-   The Pygame visualizer (managed by the game world instance in `src/core/game_world.py`) shows the current state of the arena, including players and obstacles. The visualizer launches after the API server has initialized.
+UPC_PyGame is a 2D multiplayer arena shooter simulation developed as part of the Python course at UPC_ETSEIB. It features a FastAPI-based server that manages the game state and physics simulation using Pymunk. Agents connect via an HTTP API to control their players, while a Pygame-based visualizer displays the real-time state of the game world.
 
-You can launch the demo by running:
-```bash
-python main.py
-```
-This will concurrently start the API server, the game world and the visualizer.
+This project serves as a demonstration platform and a basis for agent-based competitions.
 
-After launching the demo with `python main.py`, open multiple different terminals and run:
-```bash
-python dummy_agent.py
-```
-This will automatically connect the agent to the server and creates a player who is ready to play by pressing the keys:
+## Features
 
-Spacebar: Shoot
-Arrow Up/Down: Thrust forward/backward
-Arrow Left/Right: Rotate the player left/right
-Enter Key: Poll and display the current relative game state in the console
+*   **Multiplayer:** Supports multiple agents connecting and controlling players simultaneously.
+*   **Physics Simulation:** Uses the Pymunk 2D physics library for realistic movement, collisions, and bouncing.
+*   **API Control:** Agents interact with the game world through a simple HTTP API built with FastAPI.
+*   **Real-time Visualization:** A Pygame window displays the current state of the arena, including players, obstacles and projectiles.
+*   **Player Mechanics:**
+    *   Triangle-shaped players with unique colors.
+    *   Health system with damage from projectiles and obstacles (obstacle damage currently disabled in handler).
+    *   Spawn protection period.
+    *   Ability to shoot projectiles (colored based on the player).
+*   **Game Elements:**
+    *   Static circular obstacles.
+    *   Arena boundaries.
+*   **Relative State Information:** Agents can query the game state relative to their own position and orientation.
+
+## Architecture
+
+The system consists of three main components:
+
+1.  **Game Server (FastAPI + Pymunk):**
+    *   Located in `src/api/` and `src/core/`.
+    *   Manages the core game loop, physics simulation (`GameWorld`), and object states (`game_objects.py`).
+    *   Exposes an HTTP API (`api_endpoints.py`) for agent interaction.
+    *   Started via `main.py`.
+2.  **Visualizer (Pygame):**
+    *   Integrated within `src/core/game_world.py` (`run_visualizer` method).
+    *   Reads the state directly from the `game_world_instance`.
+    *   Renders the game graphically.
+    *   Launched by `main.py` in the main thread after the server starts.
+3.  **Agent (Client):**
+    *   Example implementation: [`dummy_agent.py`](c:\_Bibliothek\UPC_PyGame\dummy_agent.py).
+    *   Connects to the FastAPI server via HTTP requests (`requests` library).
+    *   Sends control commands (thrust, rotate, shoot) to the API.
+    *   Receives relative game state information from the API.
+    *   Must be run as a separate process *after* `main.py` has started the server.
 
 ## Installation
 
-1. **Create and Activate a Virtual Environment:**  
-   Open your terminal in the project root (where `requirements.txt` is located) and run:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate   # On Linux/macOS
-   # On Windows, use: venv\Scripts\activate
-   ```
-2. **Install Dependencies:**  
-   With the virtual environment activated, install the required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
+1.  **Clone the Repository (if you haven't already):**
+    ```bash
+    git clone git@github.com:DaniFabi24/UPC_PyGame.git
+    ```
+2.  **Create and Activate a Virtual Environment:**
+    Open your terminal in the project root (where [`requirements.txt`](c:\_Bibliothek\UPC_PyGame\requirements.txt) is located) and run:
+    ```bash
+    # Using python's built-in venv module
+    python -m venv venv
+    # Activate the environment
+    # On Linux/macOS:
+    source venv/bin/activate
+    # On Windows (Command Prompt/PowerShell):
+    .\venv\Scripts\activate
+    ```
+3.  **Install Dependencies:**
+    With the virtual environment activated, install the required packages:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-## Usage
+## Running the Simulation
 
-1. **Launch the System:**  
-   Start the demo by executing:
-   ```bash
-   python main.py
-   ```
-   This will start the API server, launch the dummy agent, and open the Pygame visualizer.
-2. **Control the Dummy Agent:**  
-   - **Spacebar:** Shoot  
-   - **Arrow Keys:**  
-     - Up and Down for thrust forward or backward  
-     - Left and Right to rotate the player  
-   - **Enter Key:** Poll and display the current relative game state in the console.
-3. **Observing the Visualizer:**  
-   The visualizer window displays the game arena with players, obstacles and projectiles. Health bars and other visual feedback help track the game state.
+1.  **Start the Server and Visualizer:**
+    Run the main script. This starts the FastAPI server in a background thread and then launches the Pygame visualizer in the main thread.
+    ```bash
+    python main.py
+    ```
+    Wait for the console output indicating the server is running and the visualizer window to appear.
+
+2.  **Run Agent(s):**
+    *After* the server and visualizer are running, open one or more *separate* terminal windows (ensure the virtual environment is activated in each). In each terminal, run the dummy agent script:
+    ```bash
+    python dummy_agent.py
+    ```
+    Each execution will connect a new agent/player to the game.
+
+## Agent Control (`dummy_agent.py`)
+
+Use the following keys in the Pygame window created by `dummy_agent.py` to control your player:
+
+*   **Spacebar:** Shoot a projectile.
+*   **Arrow Up:** Apply forward thrust.
+*   **Arrow Down:** Apply backward thrust (brake/reverse).
+*   **Arrow Left:** Rotate the player left.
+*   **Arrow Right:** Rotate the player right.
+*   **Enter Key:** Request and print the current relative game state to the agent's console.
+
+## API Overview
+
+The FastAPI server exposes the following key endpoints for agent interaction (base URL defined in [`src/settings.py`](c:\_Bibliothek\UPC_PyGame\src\settings.py)):
+
+*   `POST /connect`: Connects a new agent, returns a unique `player_id`.
+*   `POST /disconnect/{player_id}`: Disconnects the specified player.
+*   `GET /player/{player_id}/state`: Retrieves the game state relative to the specified player (includes nearby objects, velocity, health).
+*   `POST /player/{player_id}/thrust_forward`: Applies forward thrust.
+*   `POST /player/{player_id}/thrust_backward`: Applies backward thrust.
+*   `POST /player/{player_id}/rotate_left`: Applies left rotation torque.
+*   `POST /player/{player_id}/rotate_right`: Applies right rotation torque.
+*   `POST /player/{player_id}/shoot`: Fires a projectile.
+
+*(Refer to [`src/api/api_endpoints.py`](c:\_Bibliothek\UPC_PyGame\src\api\api_endpoints.py) for implementation details)*
+
+## Configuration
+
+Key game parameters can be adjusted in [`src/settings.py`](c:\_Bibliothek\UPC_PyGame\src\settings.py), including:
+
+*   API host and port.
+*   Screen dimensions and FPS.
+*   Physics settings (timestep).
+*   Player movement forces, rotation speed, max speed, health, scan radius.
+*   Projectile speed, radius, lifetime, damage.
 
 ## Competition Instructions
 
-For competition purposes:
-- **Agent Submission:**  
-  Participants can develop their own agent by modifying or creating new versions of `dummy_agent.py`. Make sure your agent connects to the existing API endpoints and follows the control commands (thrust, rotate, shoot) protocol.
-- **Game Type:**  
-  This is a multiplayer, every-against-everyone shooter. The objective is to be the last survivor in the arena.
-- **Code Standards:**  
-  Keep your code modular and focused on API communication using FastAPI. Your agent should operate independently and be thoroughly tested with the provided game server.
-- **Evaluation Criteria:**  
-  - **Functionality:** Your agent must successfully connect, control, and retrieve game state information.  
-  - **Performance:** Agents that efficiently process game state and respond to control commands will be favored.  
-  - **Innovation:** Creative strategies for navigating the arena, collecting power-ups, and engaging opponents can earn bonus recognition.
-- **Submission:**  
-  Submit your modified agent code along with a brief explanation of your strategy and any improvements made over the dummy agent implementation.
+*   **Objective:** Be the last player surviving in the arena. This is a free-for-all deathmatch.
+*   **Agent Development:** Modify [`dummy_agent.py`](c:\_Bibliothek\UPC_PyGame\dummy_agent.py) or create your own agent script that interacts with the game server via the defined HTTP API.
+*   **Focus:** Your agent should make decisions based on the relative state information received from the `/player/{player_id}/state` endpoint.
+*   **Code Standards:** Ensure your agent code is readable and connects/interacts correctly with the provided server API.
+*   **Evaluation:** Agents will be evaluated based on functionality (correct interaction), performance (efficiency in processing state and reacting), survival time, and potentially strategic innovation (use of environment, aiming).
+*   **Submission:** Submit your agent script (`.py` file) along with a brief description of its strategy.
 
-Happy coding, and may the best agent win!
-Happy coding, and may the best agent win!
+
+## Contributing
+
+Feel free to report issues or suggest improvements using the templates provided in the `.github` directory:
+
+*   **Issues:** [`general_issue.md`](/.github/DISCUSSIONS_TEMPLATE/ISSUE_TEMPLATE/general_issue.md)
+*   **Discussions:** [`general_discussion.md`](.github/DISCUSSIONS_TEMPLATE/general_discussion.md)
