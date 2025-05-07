@@ -71,7 +71,33 @@ The system consists of three main components:
     pip install -r requirements.txt
     ```
 
-## Running the Simulation
+## Running the Simulation at once (with `run_game.sh`)
+
+To quickly start the full simulation (server, visualizer, and multiple agents) in one step:
+
+1. **Ensure the script is executable:** 
+
+```bash
+chmod +x run_game.sh
+```
+(You only need to do this once.)
+
+2. **Run the game:**
+
+```bash
+./run_game.sh
+```
+After launching, you will be asked how many agents you want to start.
+Once you enter a number and press Enter, the script will:
+
+- launch the FastAPI server in the background,
+
+- open the Pygame visualizer window,
+
+- and automatically start the specified number of agents in parallel.
+
+
+## Running the Simulation step by step
 
 1.  **Start the Server and Visualizer:**
     Run the main script. This starts the FastAPI server in a background thread and then launches the Pygame visualizer in the main thread.
