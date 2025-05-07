@@ -31,3 +31,6 @@ ALLOW_FRIENDLY_FIRE = False     # If True, projectiles can damage the player who
 
 # --- Obstacle Configuration ---
 OBSTACLE_DAMAGE = 1             # Amount of health points deducted when a player collides with an obstacle (currently disabled in collision handler)
+
+# --- Countdown Configuration ---
+COUNTDOWN_DURATION = 3.0  # Dauer des Countdowns in Sekunden, bevor das Spiel startet

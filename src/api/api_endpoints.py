@@ -62,6 +62,22 @@ def get_world_state(player_id: str):
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
+@app.post("/player/ready/{player_id}")
+async def ready_to_play(player_id: str):
+    """
+    Args:
+        player_id (str): The identifier of the player.
+    
+    Returns:
+    
+    Raises:
+        HTTPException: If the player is not found.
+    """
+    if player_id not in game_world_instance.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+    game_world_instance.player_ready(player_id)
+    return {"message": f"Player {player_id} is ready to play"}
+
 @app.post("/connect")
 async def connect_player():
     """

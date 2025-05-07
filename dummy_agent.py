@@ -153,6 +153,11 @@ class Agent:
                     # ENTER key polls for the current game state.
                     elif event.key == pygame.K_RETURN: 
                         self.get_state() 
+                    elif event.key == pygame.K_RSHIFT:
+                        response = requests.post(f"{API_URL}/player/ready/{self.player_id}")
+                        response.raise_for_status()  # Raises an exception for HTTP errors.
+                        print(f"Player {self.player_id} is ready to play.")
+
 
             # Continuous action sending based on key hold status.
             if self.player_id:

@@ -22,7 +22,6 @@ PLAYER_COLORS = [
     (255, 255, 255), # White
     (192, 192, 192)  # Silver
 ]
-NEXT_COLOR_INDEX = 0  # Global variable to keep track of next player color (also managed in GameWorld)
 
 class GameWorld:
     """
@@ -51,8 +50,15 @@ class GameWorld:
         self._physics_task = None   # Holds the asyncio task for the physics loop
         self.is_running = False     # Flag indicating whether the physics loop is active
         self.next_color_index = 0   # Index to select the next player color from PLAYER_COLORS
+        self.game_started = False # Flag indicating whether the game has started
+        self.waiting_for_players = True # Flag indicating whether the game is waiting for players to join
+        # NEU: Countdown-Zustandsvariablen
+        self.countdown_active = False
+        self.countdown_seconds_remaining = 0.0
 
         self.add_borders()  # Create and add border segments to the physics space
+        self.initialize_world_objects() # *** HINDERNISSE SOFORT INITIALISIEREN ***
+        self.initialize_collision_handlers() # Kollisionshandler auch früh initialisieren
 
     def add_player(self):
         """
@@ -64,6 +70,12 @@ class GameWorld:
         Returns:
             str or None: The player's unique ID if spawn is successful; otherwise, None.
         """
+        if self.game_started:
+            print("Game has already started. No new players can join.")
+            return None
+        # Spieler können während des Countdowns beitreten. Sie starten als 'nicht bereit'.
+        # Die finale Prüfung am Ende des Countdowns wird dies berücksichtigen.
+
         player_id = str(uuid.uuid4())
         max_attempts = 10
         safe_spawn_pos = None
@@ -168,26 +180,86 @@ class GameWorld:
             border.collision_type = 3  # Collision type for borders
             self.space.add(border)
 
-    def initialize_world(self):
-        """
-        Initializes the game world by adding predefined obstacles to create an arena.
-        
-        Also sets up collision handlers for various game object interactions.
-        """
-        arena_obstacles = [
-            CircleObstacle([150, 150], 40, game_world=self),
-            CircleObstacle([650, 150], 40, game_world=self),
-            CircleObstacle([150, 450], 40, game_world=self),
-            CircleObstacle([650, 450], 40, game_world=self),
-            CircleObstacle([400, 150], 30, game_world=self),
-            CircleObstacle([400, 450], 30, game_world=self),
-            CircleObstacle([250, 300], 50, game_world=self),
-            CircleObstacle([550, 300], 50, game_world=self),
-        ]
-        for obstacle in arena_obstacles:
-            self.add_object(obstacle)
+    def initialize_world_objects(self):
+        """Initializes obstacles. Called early.""" # Geändert: Wird jetzt früh aufgerufen
+        # Sicherstellen, dass Objekte nur einmal hinzugefügt werden, falls diese Methode
+        # aus irgendeinem Grund mehrmals aufgerufen werden könnte.
+        # Da es jetzt im __init__ ist, ist die "if not self.objects" Bedingung
+        # für Hindernisse nicht mehr so kritisch, aber schadet nicht.
+        existing_obstacle_count = sum(1 for obj in self.objects if isinstance(obj, CircleObstacle))
+        if existing_obstacle_count == 0:
+            arena_obstacles = [
+                CircleObstacle([150, 150], 40, game_world=self),
+                CircleObstacle([650, 150], 40, game_world=self),
+                CircleObstacle([150, 450], 40, game_world=self),
+                CircleObstacle([650, 450], 40, game_world=self),
+                CircleObstacle([400, 150], 30, game_world=self),
+                CircleObstacle([400, 450], 30, game_world=self),
+                CircleObstacle([250, 300], 50, game_world=self),
+                CircleObstacle([550, 300], 50, game_world=self),
+            ]
+            for obstacle in arena_obstacles:
+                self.add_object(obstacle)
+            print("Game world objects (obstacles) initialized.")
+        else:
+            print("Obstacles already initialized.")
+
+    def initialize_collision_handlers(self):
+        """Initializes collision handlers. Can be called early."""
         from .game_objects import setup_collision_handlers
         setup_collision_handlers(self.space, self)
+        print("Collision handlers initialized.")
+
+    def check_if_all_players_ready(self):
+        """
+        Prüft, ob alle verbundenen Spieler bereit sind.
+        Wenn ja und noch kein Countdown läuft, wird der Countdown gestartet.
+        Diese Methode blockiert NICHT mehr mit time.sleep.
+        """
+        if not self.players: # Keine Spieler, also nicht bereit und kein Countdown
+            self.waiting_for_players = True
+            self.game_started = False
+            self.countdown_active = False
+            return False
+
+        all_currently_ready = all(player.ready for player in self.players.values())
+
+        if all_currently_ready and self.waiting_for_players and not self.countdown_active:
+            # Alle Bedingungen erfüllt, um den Countdown zu STARTEN
+            print("All players ready! Starting countdown...")
+            self.countdown_active = True
+            self.countdown_seconds_remaining = COUNTDOWN_DURATION
+            self.waiting_for_players = False # Wechsel in den Countdown-Modus
+            for player in self.players.values():
+                player.spawn_protection_until = time.time() + player.spawn_protection_duration + COUNTDOWN_DURATION
+        elif not all_currently_ready and self.countdown_active:
+            # Jemand wurde während des Countdowns unready (z.B. Disconnect)
+            print("Not all players ready during countdown. Resetting to waiting state.")
+            self.countdown_active = False
+            self.waiting_for_players = True
+            # game_started bleibt False
+        elif not all_currently_ready and not self.game_started:
+            # Allgemeiner Fall: Nicht alle bereit, kein Countdown, Spiel nicht gestartet -> Wartezustand sicherstellen
+            self.waiting_for_players = True
+            self.game_started = False # Sicherstellen, dass Spiel nicht als gestartet markiert ist
+
+        return all_currently_ready
+
+    def player_ready(self, player_id):
+        player = self.players.get(player_id)
+        if player:
+            if self.game_started:
+                print(f"Player {player_id} tried to set ready, but game has already started.")
+                return
+
+            if not player.ready:
+                player.ready = True
+                print(f"Player {player_id} is now ready.")
+                self.check_if_all_players_ready() # Prüfen, ob Countdown gestartet werden kann
+            else:
+                print(f"Player {player_id} was already ready.")
+        else:
+            print(f"Player_ready called for non-existent player {player_id}")
 
     def positive_player_thrust(self, player_id):
         """
@@ -196,6 +268,7 @@ class GameWorld:
         Args:
             player_id (str): The identifier of the player.
         """
+        if not self.game_started: return # Spiel noch nicht gestartet
         player = self.players.get(player_id)
         if player:
             radians = player.body.angle
@@ -209,6 +282,7 @@ class GameWorld:
         Args:
             player_id (str): The identifier of the player.
         """
+        if not self.game_started: return
         player = self.players.get(player_id)
         if player:
             radians = player.body.angle
@@ -222,6 +296,7 @@ class GameWorld:
         Args:
             player_id (str): The identifier of the player.
         """
+        if not self.game_started: return
         player = self.players.get(player_id)
         if player:
             player.body.angle += PLAYER_ROTATION
@@ -233,6 +308,7 @@ class GameWorld:
         Args:
             player_id (str): The identifier of the player.
         """
+        if not self.game_started: return
         player = self.players.get(player_id)
         if player:
             player.body.angle -= PLAYER_ROTATION
@@ -246,6 +322,9 @@ class GameWorld:
         Args:
             player_id (str): The identifier of the player who is firing.
         """
+        if not self.game_started:
+            print(f"Player {player_id} tried to shoot, but game has not started.")
+            return
         player = self.players.get(player_id)
         if player:
             # Prevent shooting when spawn protection is active.
@@ -291,6 +370,33 @@ class GameWorld:
         for shape in self.space.shapes:
             if hasattr(shape, "sprite_ref"):
                 shape.sprite_ref.update(dt)
+
+        # Countdown-Logik
+        if self.countdown_active:
+            self.countdown_seconds_remaining -= dt
+            if self.countdown_seconds_remaining <= 0:
+                self.countdown_seconds_remaining = 0 # Verhindere negative Werte
+                print("Countdown timer reached zero. Final check for player readiness...")
+                # Finale Prüfung: Sind ALLE aktuell verbundenen Spieler bereit?
+                if self.players and all(p.ready for p in self.players.values()):
+                    self.waiting_for_players = False
+                    self.game_started = True
+                    self.countdown_active = False
+                else:
+                    print("Not all players ready after countdown (or no players left). Resetting to waiting state.")
+                    self.countdown_active = False
+                    self.waiting_for_players = True # Zurück zum Wartezustand
+                    # game_started bleibt False
+            # Der Visualizer zeigt countdown_seconds_remaining an
+
+        # Spielspezifische Updates (Projektile, Power-Ups etc.) nur, wenn das Spiel gestartet ist
+        if self.game_started:
+            for shape in self.space.shapes:
+                # Spieler wurden bereits oben aktualisiert
+                if hasattr(shape, "sprite_ref") and not isinstance(shape.sprite_ref, Triangle):
+                    shape.sprite_ref.update(dt) # Projektile, PowerUps etc.
+        # Wenn game_started False ist (d.h. waiting_for_players oder countdown_active),
+        # werden diese spielspezifischen Updates übersprungen.
 
     async def _run_physics_loop(self, dt):
         """
@@ -344,18 +450,23 @@ class GameWorld:
             dict: Contains player states, object states (excluding players), and shot count.
         """
         return {
+            "game_started": self.game_started,
+            "waiting_for_players": self.waiting_for_players,
+            "countdown_active": self.countdown_active,
+            "countdown_seconds_remaining": math.ceil(self.countdown_seconds_remaining) if self.countdown_active else 0,
             "players": [
                 {
                     "id": pid,
                     "position": [p.body.position.x, p.body.position.y],
                     "angle": math.degrees(p.body.angle),
-                    "health": p.health
+                    "health": p.health,
+                    "ready": p.ready # Spieler-Bereitschaftsstatus hinzufügen
                 } for pid, p in self.players.items()
             ],
             "objects": [obj.to_dict() for obj in self.objects if not isinstance(obj, Triangle)],
             "shots_fired": self.shot_count,
         }
-
+    
     def get_relative_state_for_player(self, player_id):
         """
         Returns a relative view of the game state from a player's perspective.
@@ -369,6 +480,7 @@ class GameWorld:
         Returns:
             dict or None: The relative game state or None if the player is not found.
         """
+        if not self.game_started: return
         player = self.players.get(player_id)
         if not player:
             return None
@@ -438,10 +550,15 @@ class GameWorld:
                 })
 
         return {
+            "game_started": self.game_started,
+            "waiting_for_players": self.waiting_for_players,
+            "countdown_active": self.countdown_active,
+            "countdown_seconds_remaining": math.ceil(self.countdown_seconds_remaining) if self.countdown_active else 0,
             "player_id": player_id,
             "health": player_health,
             "angular_velocity": player_angular_vel,
             "velocity": [player_vel.x, player_vel.y],
+            "ready": player.ready, # Eigener Bereitschaftsstatus
             "nearby_objects": nearby_objects_relative
         }
 
@@ -457,67 +574,69 @@ class GameWorld:
         screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Game Visualizer")
         clock = pygame.time.Clock()
-
-        # Create a static background surface with obstacles.
-        background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        background.fill((0, 0, 0))  # Black background
-        static_sprites = pygame.sprite.Group()
-        for obj in self.objects:
-            if isinstance(obj, CircleObstacle):
-                static_sprites.add(obj)
-        static_sprites.draw(background)
-
+        all_game_sprites = pygame.sprite.Group()
         running = True
+        font = pygame.font.SysFont(None, 36) # Slightly larger font
+
         while running:
-            screen.blit(background, (0, 0))
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
 
-            # Create a sprite group for currently active sprites.
-            current_sprites = pygame.sprite.Group()
+            screen.fill((0, 0, 0)) # Always fill background black
+
+            all_game_sprites.empty()
+
+            # Always add players to the sprite group
             for player in self.players.values():
-                current_sprites.add(player)
+                all_game_sprites.add(player)
+
+            # Add obstacles and other objects (projectiles, power-ups)
             for obj in self.objects:
-                if isinstance(obj, Projectile):
-                    current_sprites.add(obj)
+                if isinstance(obj, pygame.sprite.Sprite):
+                    all_game_sprites.add(obj)
+            
+            dt_visual = clock.tick(FPS) / 1000.0
+            all_game_sprites.update(dt_visual) # Sprite updates (position, alpha, etc.)
+            all_game_sprites.draw(screen) # Draw all sprites
 
-            # Update sprites (position, rotation, spawn protection transparency).
-            dt = clock.tick(FPS) / 1000.0
-            current_sprites.update(dt)
-            current_sprites.draw(screen)
-
-            # Draw health bars for players.
-            bar_width = 30   # Width of the health bar
-            bar_height = 5   # Height of the health bar
-            bar_offset_y = 5 # Vertical offset below the player sprite
-            health_color = (0, 255, 0)        # Green for remaining health
-            lost_health_color = (255, 0, 0)     # Red for lost health
-            border_color = (255, 255, 255)      # White border
-
+            # Display health bars
+            bar_width = 30; bar_height = 5; bar_offset_y = 5
+            health_color = (0, 255, 0); lost_health_color = (255, 0, 0); border_color = (255, 255, 255)
             for player in self.players.values():
                 bar_x = player.rect.centerx - bar_width // 2
                 bar_y = player.rect.bottom + bar_offset_y
                 health_percentage = max(0, player.health / PLAYER_START_HEALTH)
-
-                # Draw background (lost health).
                 background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
                 pygame.draw.rect(screen, lost_health_color, background_rect)
-
-                # Draw current health overlay.
                 current_bar_width = int(bar_width * health_percentage)
                 if current_bar_width > 0:
                     health_rect = pygame.Rect(bar_x, bar_y, current_bar_width, bar_height)
                     pygame.draw.rect(screen, health_color, health_rect)
-
-                # Draw the border.
                 pygame.draw.rect(screen, border_color, background_rect, 1)
 
-            pygame.display.flip()
+            # Text display based on game state
+            display_text = ""
+            text_color = (255, 255, 0) # Default Yellow
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
+            if self.waiting_for_players:
+                display_text = "Waiting for players..."
+            elif self.game_started and self.countdown_active: 
+                display_text = ""
+                text_color = (0, 0, 0)
+            elif self.countdown_active:
+                display_text = f"Game starting in {math.ceil(self.countdown_seconds_remaining)}..."
+                text_color = (0, 255, 255) # Cyan for countdown
+            
+            if display_text: # Only render and blit if there's text to display
+                text_surface = font.render(display_text, True, text_color)
+                text_rect = text_surface.get_rect(center=(self.width // 2, 30))
+                screen.blit(text_surface, text_rect)
+
+            pygame.display.flip()
 
         pygame.quit()
 
 # Create global instance after initialization:
 game_world_instance = GameWorld(SCREEN_WIDTH, SCREEN_HEIGHT)
-game_world_instance.initialize_world()
+# game_world_instance.initialize_world() # Wird jetzt durch check_if_all_players_ready() bzw. start_physics_engine() gehandhabt

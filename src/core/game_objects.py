@@ -30,7 +30,7 @@ class Triangle(pygame.sprite.Sprite):
         self.player_id = None  # To be assigned by the GameWorld
         # Spawn protection prevents damage immediately after spawn.
         self.spawn_protection_duration = 3.0  # Seconds of protection
-        self.spawn_protection_until = time.time() + self.spawn_protection_duration
+        self.spawn_protection_until = -1
 
         mass = 1
         moment = pymunk.moment_for_poly(mass, [
@@ -49,6 +49,7 @@ class Triangle(pygame.sprite.Sprite):
         ])
         self.shape.collision_type = 1   # Collision type for players
         self.shape.sprite_ref = self    # Link back to this sprite
+        self.ready = False  # Indicates if the player is ready to play
 
         if game_world:
             game_world.space.add(self.body, self.shape)
@@ -103,9 +104,15 @@ class Triangle(pygame.sprite.Sprite):
         self.rect = rotated_image.get_rect(center=self.rect.center)
         self.image = rotated_image
 
-        # Change transparency if still under spawn protection.
-        if time.time() < self.spawn_protection_until:
-            self.image.set_alpha(128)  # Semi-transparent
+        # Change transparency if still under spawn protection.^
+        if not self.ready:
+            self.image.set_alpha(80)
+        elif time.time() < self.spawn_protection_until:
+            # Make alpha pulsate between 64 and 192
+            alpha = 128 + 64 * math.sin(time.time() * 5)  # Pulsate with a frequency of 5 Hz
+            self.image.set_alpha(int(alpha))
+        elif self.ready:
+            self.image.set_alpha(255)
         else:
             self.image.set_alpha(255)  # Fully opaque
 
