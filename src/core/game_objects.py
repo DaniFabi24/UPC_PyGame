@@ -90,13 +90,18 @@ class Triangle(pygame.sprite.Sprite):
     def update(self, dt):
         """
         Updates the Triangle sprite's position, rotation, and visual effects.
-        
-        The new position is taken from the physics body. The sprite image is also rotated.
-        Additionally, if the sprite is still under spawn protection, it is drawn semi-transparent.
+        Also ensures the player's speed does not exceed PLAYER_MAX_SPEED.
         
         Args:
             dt (float): Delta time since the last update.
         """
+        # Limit the player's speed
+        speed = self.body.velocity.length
+        if speed > PLAYER_MAX_SPEED:
+            scale = PLAYER_MAX_SPEED / speed
+            self.body.velocity = self.body.velocity * scale
+
+        # Update position and rotation
         pos = self.body.position
         self.rect.center = (int(pos.x), int(pos.y))
         self.angle = math.degrees(self.body.angle)
@@ -104,7 +109,7 @@ class Triangle(pygame.sprite.Sprite):
         self.rect = rotated_image.get_rect(center=self.rect.center)
         self.image = rotated_image
 
-        # Change transparency if still under spawn protection.^
+        # Change transparency if still under spawn protection
         if not self.ready:
             self.image.set_alpha(80)
         elif time.time() < self.spawn_protection_until:
@@ -357,17 +362,27 @@ def player_hit_obstacle(arbiter, space, data):
 
     if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
         player_sprite = player_shape.sprite_ref
-        # Optionally, apply damage here: player_sprite.take_damage(OBSTACLE_DAMAGE)
-        game_world.player_collisions += 1
-        print(f"Player collided with obstacle. Health: {player_sprite.health}")
+        # Check the player's velocity
+        velocity = player_sprite.body.velocity.length
+        if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
+            player_sprite.take_damage(OBSTACLE_DAMAGE)
+            game_world.player_collisions += 1
+            print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
+        else:
+            print(f"Player collided with obstacle at low speed. No damage taken.")
     else:
         # If shapes are reversed, swap and try again.
         player_shape, obstacle_shape = obstacle_shape, player_shape
         if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
             player_sprite = player_shape.sprite_ref
-            # Optionally, apply damage here.
+        # Check the player's velocity
+        velocity = player_sprite.body.velocity.length
+        if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
+            player_sprite.take_damage(OBSTACLE_DAMAGE)
             game_world.player_collisions += 1
-            print(f"Player collided with obstacle (reversed shapes). Health: {player_sprite.health}")
+            print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
+        else:
+            print(f"Player collided with obstacle at low speed. No damage taken.")
 
     return True
 

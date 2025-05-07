@@ -14,7 +14,7 @@ PHYSICS_DT = 1/FPS      # Time step for each physics simulation update (delta ti
 # --- Player Movement Parameters ---
 PLAYER_THRUST = 5       # Force applied when the player accelerates forward
 PLAYER_ROTATION = 0.05  # Angular velocity applied when the player rotates (in radians per update)
-PLAYER_MAX_SPEED = 40   # Maximum linear velocity the player can reach
+PLAYER_MAX_SPEED = 100   # Maximum linear velocity the player can reach
 
 # --- Player Attributes ---
 PLAYER_START_HEALTH = 5 # Initial health points for each player

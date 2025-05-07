@@ -472,7 +472,7 @@ class GameWorld:
         Returns a relative view of the game state from a player's perspective.
         
         The returned state includes the player's health, velocity, angular velocity, and nearby objects 
-        (players, obstacles, projectiles) within a specified scanning radius.
+        (players, obstacles, projectiles, and borders) within a specified scanning radius.
         
         Args:
             player_id (str): The identifier of the player.
@@ -480,7 +480,8 @@ class GameWorld:
         Returns:
             dict or None: The relative game state or None if the player is not found.
         """
-        if not self.game_started: return
+        if not self.game_started: 
+            return
         player = self.players.get(player_id)
         if not player:
             return None
@@ -549,6 +550,25 @@ class GameWorld:
                     "color": other_player.color,
                 })
 
+        # Process borders
+        for shape in self.space.shapes:
+            if isinstance(shape, pymunk.Segment) and shape.collision_type == 3:  # Border collision type
+                # Calculate the shortest distance from the player to the border segment
+                query_info = shape.point_query(player_pos)
+                distance = query_info.distance
+
+                if distance <= radius:
+                    # Calculate the relative position of the closest point on the border
+                    closest_point = query_info.point
+                    delta_pos = closest_point - player_pos
+                    relative_pos_rotated = delta_pos.rotated(-player_angle_rad)
+
+                    nearby_objects_relative.append({
+                        "type": "border",
+                        "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
+                        "distance": distance
+                    })
+
         return {
             "game_started": self.game_started,
             "waiting_for_players": self.waiting_for_players,
@@ -558,7 +578,7 @@ class GameWorld:
             "health": player_health,
             "angular_velocity": player_angular_vel,
             "velocity": [player_vel.x, player_vel.y],
-            "ready": player.ready, # Eigener Bereitschaftsstatus
+            "ready": player.ready,  # Player's readiness status
             "nearby_objects": nearby_objects_relative
         }
 
