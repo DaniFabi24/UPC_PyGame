@@ -52,7 +52,7 @@ The system consists of three main components:
 
 1.  **Clone the Repository (if you haven't already):**
     ```bash
-    git clone -b max git@github.com:DaniFabi24/UPC_PyGame.git
+    git clone git@github.com:DaniFabi24/UPC_PyGame.git
     ```
 2.  **Create and Activate a Virtual Environment:**
     Open your terminal in the project root (where [`requirements.txt`](.\requirements.txt) is located) and run:
