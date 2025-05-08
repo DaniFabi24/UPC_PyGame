@@ -1,7 +1,8 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+import time
 from src.core.game_world import game_world_instance
 from ..settings import PHYSICS_DT
 
@@ -15,6 +16,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Cooldown Management ---
+# Einfache In-Memory-Speicherung für Cooldowns. Für Produktion ggf. Redis o.ä. verwenden.
+# Struktur: { "player_id": { "endpoint_name": last_call_timestamp }}
+player_cooldowns = {}
+
+# Cooldown-Dauern in Sekunden
+COOLDOWN_SCAN_ENVIRONMENT = 0.5
+COOLDOWN_PLAYER_STATE = 0.5
+COOLDOWN_GAME_STATE = 0.5
+COOLDOWN_SHOOT = 0.1
+
+def check_cooldown(player_id: str, endpoint_name: str, cooldown_duration: float):
+    """Prüft und aktualisiert den Cooldown für einen Spieler und Endpunkt."""
+    now = time.time()
+    if player_id not in player_cooldowns:
+        player_cooldowns[player_id] = {}
+
+    last_call = player_cooldowns[player_id].get(endpoint_name, 0)
+
+    if now - last_call < cooldown_duration:
+        remaining_cooldown = cooldown_duration - (now - last_call)
+        raise HTTPException(
+            status_code=429, # Too Many Requests
+            detail=f"Cooldown active: {endpoint_name}. Wait {remaining_cooldown:.2f} seconds."
+        )
+    player_cooldowns[player_id][endpoint_name] = now
+    return True # Cooldown bestanden
 
 @app.on_event("startup")
 async def startup_event():
@@ -38,41 +67,28 @@ def read_root():
     return {"message": "Welcome to the UPC Game API with WebSockets!"}
 
 @app.get("/player/{player_id}/scan")
-def get_environment_scan(player_id: str):
-    """
-    """
-    if player_id not in game_world_instance.players:
-        raise HTTPException(status_code=404, detail="Player not found")
-    try:
-        state = game_world_instance.scan_environment(player_id)
-        return state
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+async def get_scan_environment(player_id: str):
+    check_cooldown(player_id, "scan_environment", COOLDOWN_SCAN_ENVIRONMENT)
+    scan_data = game_world_instance.scan_environment(player_id)
+    if scan_data is None:
+        pass
+    return scan_data
 
-@app.get("/player/{player_id}/player-state")
-def get_player_state(player_id: str):
-    """
-    """
-    if player_id not in game_world_instance.players:
-        raise HTTPException(status_code=404, detail="Player not found")
-    try:
-        state = game_world_instance.player_state(player_id)
-        return state
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+@app.get("/player/{player_id}/state")
+async def get_player_own_state(player_id: str):
+    check_cooldown(player_id, "state", COOLDOWN_PLAYER_STATE)
+    state_data = game_world_instance.player_state(player_id)
+    if state_data is None:
+        raise HTTPException(status_code=404, detail=f"Player {player_id} not found or no state available.")
+    return state_data
 
 @app.get("/player/{player_id}/game-state")
-def get_game_state(player_id: str):
-    """
-    """
-    if player_id not in game_world_instance.players:
-        raise HTTPException(status_code=404, detail="Player not found")
-    try:
-        state = game_world_instance.game_state(player_id)
-        return state
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-
+async def get_overall_game_state(player_id: str):
+    check_cooldown(player_id, "game_state", COOLDOWN_GAME_STATE)
+    state_data = game_world_instance.game_state(player_id)
+    if state_data is None:
+        raise HTTPException(status_code=404, detail=f"Could not retrieve game state for player {player_id}.")
+    return state_data
 
 @app.post("/player/ready/{player_id}")
 async def ready_to_play(player_id: str):
@@ -183,6 +199,7 @@ async def shoot(player_id: str):
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
+    check_cooldown(player_id, "shoot", COOLDOWN_SHOOT)
     game_world_instance.shoot(player_id)
     return {"message": f"Player {player_id} shot"}
 

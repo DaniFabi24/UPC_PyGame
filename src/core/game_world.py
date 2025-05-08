@@ -442,14 +442,20 @@ class GameWorld:
                 self._physics_task.cancel()
                 self._physics_task = None
 
+
+
+
+
+# ------------------------------------------------------------
     # Sensors for the Player are here now defined
 
     def scan_environment(self, player_id):
-        if not self.game_started: 
-            return "Game not started yet."
+        if not self.game_started:
+            # Return a consistent structure even if game not started, or handle differently
+            return {"nearby_objects": [], "message": "Game not started yet."}
         player = self.players.get(player_id)
         if not player:
-            return None
+            return {"nearby_objects": [], "message": f"Player {player_id} not found."}
 
         player_pos = player.body.position
         player_angle_rad = player.body.angle
@@ -459,22 +465,40 @@ class GameWorld:
         radius = SCANNING_RADIUS
 
         nearby_objects_relative = []
-        
+
+        # --- Rauschparameter (entweder aus settings.py oder hier direkt definieren) ---
+        # Falls nicht in settings.py definiert:
+        _POSITION_NOISE_MAX_OFFSET = 0.8
+        _VELOCITY_NOISE_MAX_OFFSET = 0.4
+        _DISTANCE_NOISE_MAX_PERCENTAGE = 0.04
+        # Wenn aus settings.py importiert, verwende z.B. POSITION_NOISE_MAX_OFFSET direkt.
+
+
         # Process non-player objects (obstacles, projectiles).
         for obj in self.objects:
-            if obj is player or not hasattr(obj, 'body'):
+            if obj is player or not hasattr(obj, 'body') or not hasattr(obj, 'radius'): # Sicherstellen, dass obj.radius existiert
                 continue
 
             obj_pos = obj.body.position
-            distance = player_pos.get_distance(obj_pos) -obj.radius
+            distance = player_pos.get_distance(obj_pos) -obj.radius - player.radius # Distanz von Oberfläche zu Oberfläche (ungefähr)
 
-            if distance <= radius:
+            if distance <= radius: # Prüfe, ob das Objekt im Scan-Radius ist (basierend auf Oberflächendistanz)
                 delta_pos = obj_pos - player_pos
                 relative_pos_rotated = delta_pos.rotated(-player_angle_rad)
 
                 obj_vel = getattr(obj.body, 'velocity', pymunk.Vec2d(0, 0))
                 delta_vel = obj_vel - player_vel
                 relative_vel_rotated = delta_vel.rotated(-player_angle_rad)
+
+                # --- Rauschen hinzufügen ---
+                noisy_relative_pos_x = relative_pos_rotated.x + random.uniform(-_POSITION_NOISE_MAX_OFFSET, _POSITION_NOISE_MAX_OFFSET)
+                noisy_relative_pos_y = relative_pos_rotated.y + random.uniform(-_POSITION_NOISE_MAX_OFFSET, _POSITION_NOISE_MAX_OFFSET)
+
+                noisy_relative_vel_x = relative_vel_rotated.x + random.uniform(-_VELOCITY_NOISE_MAX_OFFSET, _VELOCITY_NOISE_MAX_OFFSET)
+                noisy_relative_vel_y = relative_vel_rotated.y + random.uniform(-_VELOCITY_NOISE_MAX_OFFSET, _VELOCITY_NOISE_MAX_OFFSET)
+
+                noise_factor_distance = 1 + random.uniform(-_DISTANCE_NOISE_MAX_PERCENTAGE, _DISTANCE_NOISE_MAX_PERCENTAGE)
+                noisy_distance = max(0, distance * noise_factor_distance) # Sicherstellen, dass Distanz nicht negativ wird
 
                 obj_type = "unknown"
                 if isinstance(obj, CircleObstacle):
@@ -485,53 +509,71 @@ class GameWorld:
                 if obj_type != "unknown":
                     nearby_objects_relative.append({
                         "type": obj_type,
-                        "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
-                        "relative_velocity": [relative_vel_rotated.x, relative_vel_rotated.y],
-                        "distance": distance,
+                        "relative_position": [noisy_relative_pos_x, noisy_relative_pos_y],
+                        "relative_velocity": [noisy_relative_vel_x, noisy_relative_vel_y],
+                        "distance": noisy_distance,
                         "color": getattr(obj, 'color', None) if obj_type == "projectile" else None
                     })
 
         # Process other players.
-        for other_pid, other_player in self.players.items():
+        for other_pid, other_player_obj in self.players.items(): # Variable umbenannt, um Konflikt zu vermeiden
             if other_pid == player_id:
                 continue
 
-            other_player_pos = other_player.body.position
-            distance = player_pos.get_distance(other_player_pos)
+            other_player_pos = other_player_obj.body.position
+            # Distanz von Oberfläche zu Oberfläche (ungefähr)
+            distance = player_pos.get_distance(other_player_pos) - other_player_obj.radius - player.radius
+
 
             if distance <= radius:
                 delta_pos = other_player_pos - player_pos
                 relative_pos_rotated = delta_pos.rotated(-player_angle_rad)
 
-                other_player_vel = other_player.body.velocity
-                delta_vel = other_player_vel - player_vel
+                other_player_vel = other_player_obj.body.velocity
+                delta_vel = other_player_vel - player.body.velocity # Korrigiert
                 relative_vel_rotated = delta_vel.rotated(-player_angle_rad)
+
+                # --- Rauschen hinzufügen ---
+                noisy_relative_pos_x = relative_pos_rotated.x + random.uniform(-_POSITION_NOISE_MAX_OFFSET, _POSITION_NOISE_MAX_OFFSET)
+                noisy_relative_pos_y = relative_pos_rotated.y + random.uniform(-_POSITION_NOISE_MAX_OFFSET, _POSITION_NOISE_MAX_OFFSET)
+
+                noisy_relative_vel_x = relative_vel_rotated.x + random.uniform(-_VELOCITY_NOISE_MAX_OFFSET, _VELOCITY_NOISE_MAX_OFFSET)
+                noisy_relative_vel_y = relative_vel_rotated.y + random.uniform(-_VELOCITY_NOISE_MAX_OFFSET, _VELOCITY_NOISE_MAX_OFFSET)
+
+                noise_factor_distance = 1 + random.uniform(-_DISTANCE_NOISE_MAX_PERCENTAGE, _DISTANCE_NOISE_MAX_PERCENTAGE)
+                noisy_distance = max(0, distance * noise_factor_distance)
 
                 nearby_objects_relative.append({
                     "type": "other_player",
-                    "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
-                    "relative_velocity": [relative_vel_rotated.x, relative_vel_rotated.y],
-                    "distance": distance,
-                    "color": other_player.color,
+                    "relative_position": [noisy_relative_pos_x, noisy_relative_pos_y],
+                    "relative_velocity": [noisy_relative_vel_x, noisy_relative_vel_y],
+                    "distance": noisy_distance,
+                    "color": other_player_obj.color, # Korrigiert
                 })
 
         # Process borders
         for shape in self.space.shapes:
-            if isinstance(shape, pymunk.Segment) and shape.collision_type == 3:  # Border collision type
-                # Calculate the shortest distance from the player to the border segment
+            if isinstance(shape, pymunk.Segment) and shape.collision_type == 3:
                 query_info = shape.point_query(player_pos)
-                distance = query_info.distance
+                distance = query_info.distance # Kürzeste Distanz zur Border-Linie
 
                 if distance <= radius:
-                    # Calculate the relative position of the closest point on the border
                     closest_point = query_info.point
                     delta_pos = closest_point - player_pos
                     relative_pos_rotated = delta_pos.rotated(-player_angle_rad)
 
+                    # --- Rauschen hinzufügen ---
+                    noisy_relative_pos_x = relative_pos_rotated.x + random.uniform(-_POSITION_NOISE_MAX_OFFSET, _POSITION_NOISE_MAX_OFFSET)
+                    noisy_relative_pos_y = relative_pos_rotated.y + random.uniform(-_POSITION_NOISE_MAX_OFFSET, _POSITION_NOISE_MAX_OFFSET)
+
+                    noise_factor_distance = 1 + random.uniform(-_DISTANCE_NOISE_MAX_PERCENTAGE, _DISTANCE_NOISE_MAX_PERCENTAGE)
+                    noisy_distance = max(0, distance * noise_factor_distance)
+
+
                     nearby_objects_relative.append({
                         "type": "border",
-                        "relative_position": [relative_pos_rotated.x, relative_pos_rotated.y],
-                        "distance": distance
+                        "relative_position": [noisy_relative_pos_x, noisy_relative_pos_y],
+                        "distance": noisy_distance
                     })
 
         return {
@@ -570,7 +612,7 @@ class GameWorld:
 
                 # "Last Man Standing": player.last
                 # "Vote for Restart":  player.vote_for_restart
-
+# ------------------------------------------------------------
 
     def run_visualizer(self):
         """
@@ -649,4 +691,3 @@ class GameWorld:
 
 # Create global instance after initialization:
 game_world_instance = GameWorld(SCREEN_WIDTH, SCREEN_HEIGHT)
-# game_world_instance.initialize_world() # Wird jetzt durch check_if_all_players_ready() bzw. start_physics_engine() gehandhabt

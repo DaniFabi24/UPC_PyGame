@@ -103,14 +103,6 @@ class Agent:
             return None
         try:
             url = f"{API_URL}/player/{self.player_id}/scan"  # Correct endpoint for relative state.
-            response = requests.get(url)  # Using GET request for retrieving state.
-            
-            if response.status_code == 404:
-                print(f"Error: Player ID '{self.player_id}' not found on server when getting state.")
-                self.player_id = None
-                return None
-
-            response.raise_for_status()
             state_data = response.json()
             print("-" * 20)
             print("Current Relative State:")
@@ -152,18 +144,16 @@ class Agent:
                         self.send_action("shoot")
                     # ENTER key polls for the current game state.
                     elif event.key == pygame.K_RETURN: 
-                        self.get_state() 
+                        response = requests.get(f"{API_URL}/player/{self.player_id}/scan")
+                        print(f"Game-State: {response.json()}")
                     elif event.key == pygame.K_RSHIFT:
                         response = requests.post(f"{API_URL}/player/ready/{self.player_id}")
-                        response.raise_for_status()  # Raises an exception for HTTP errors.
                         print(f"Player {self.player_id} is ready to play.")
                     elif event.key == pygame.K_LSHIFT:
                         response = requests.get(f"{API_URL}/player/{self.player_id}/game-state")
-                        response.raise_for_status()  # Raises an exception for HTTP errors.
                         print(f"Game-State: {response.json()}")
                     elif event.key == pygame.K_LCTRL:
-                        response = requests.get(f"{API_URL}/player/{self.player_id}/player-state")
-                        response.raise_for_status()  # Raises an exception for HTTP errors.
+                        response = requests.get(f"{API_URL}/player/{self.player_id}/state")
                         print(f"Player-State: {response.json()}")
 
 
