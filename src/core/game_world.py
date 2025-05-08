@@ -442,46 +442,11 @@ class GameWorld:
                 self._physics_task.cancel()
                 self._physics_task = None
 
-    def to_dict(self):
-        """
-        Serializes the current game state to a dictionary.
-        
-        Returns:
-            dict: Contains player states, object states (excluding players), and shot count.
-        """
-        return {
-            "game_started": self.game_started,
-            "waiting_for_players": self.waiting_for_players,
-            "countdown_active": self.countdown_active,
-            "countdown_seconds_remaining": math.ceil(self.countdown_seconds_remaining) if self.countdown_active else 0,
-            "players": [
-                {
-                    "id": pid,
-                    "position": [p.body.position.x, p.body.position.y],
-                    "angle": math.degrees(p.body.angle),
-                    "health": p.health,
-                    "ready": p.ready # Spieler-Bereitschaftsstatus hinzufügen
-                } for pid, p in self.players.items()
-            ],
-            "objects": [obj.to_dict() for obj in self.objects if not isinstance(obj, Triangle)],
-            "shots_fired": self.shot_count,
-        }
-    
-    def get_relative_state_for_player(self, player_id):
-        """
-        Returns a relative view of the game state from a player's perspective.
-        
-        The returned state includes the player's health, velocity, angular velocity, and nearby objects 
-        (players, obstacles, projectiles, and borders) within a specified scanning radius.
-        
-        Args:
-            player_id (str): The identifier of the player.
-        
-        Returns:
-            dict or None: The relative game state or None if the player is not found.
-        """
+    # Sensors for the Player are here now defined
+
+    def scan_environment(self, player_id):
         if not self.game_started: 
-            return
+            return "Game not started yet."
         player = self.players.get(player_id)
         if not player:
             return None
@@ -501,7 +466,7 @@ class GameWorld:
                 continue
 
             obj_pos = obj.body.position
-            distance = player_pos.get_distance(obj_pos)
+            distance = player_pos.get_distance(obj_pos) -obj.radius
 
             if distance <= radius:
                 delta_pos = obj_pos - player_pos
@@ -570,17 +535,42 @@ class GameWorld:
                     })
 
         return {
-            "game_started": self.game_started,
-            "waiting_for_players": self.waiting_for_players,
-            "countdown_active": self.countdown_active,
-            "countdown_seconds_remaining": math.ceil(self.countdown_seconds_remaining) if self.countdown_active else 0,
-            "player_id": player_id,
-            "health": player_health,
-            "angular_velocity": player_angular_vel,
-            "velocity": [player_vel.x, player_vel.y],
-            "ready": player.ready,  # Player's readiness status
             "nearby_objects": nearby_objects_relative
         }
+
+    def player_state(self, player_id):
+        """
+        Retrieves the state of a specific player.
+        
+        Args:
+            player_id (str): The identifier of the player.
+        
+        Returns:
+            dict: The player's state including position, velocity, angle, and health.
+        """
+        player = self.players.get(player_id)
+        if player:
+            return {
+                "velocity": [player.body.velocity.x, player.body.velocity.y],
+                "angle": player.body.angle,
+                "health": player.health,
+                "angular_velocity": player.body.angular_velocity
+            }
+            
+    def game_state(self, player_id):
+        player = self.players.get(player_id)
+        if player:
+            return {
+                "game_started": self.game_started,
+                "waiting_for_players": self.waiting_for_players,
+                "countdown_active": self.countdown_active,
+                "countdown_seconds_remaining": math.ceil(self.countdown_seconds_remaining) if self.countdown_active else 0,
+                "ready": player.ready
+            }
+
+                # "Last Man Standing": player.last
+                # "Vote for Restart":  player.vote_for_restart
+
 
     def run_visualizer(self):
         """

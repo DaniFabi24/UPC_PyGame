@@ -37,30 +37,42 @@ def read_root():
     """
     return {"message": "Welcome to the UPC Game API with WebSockets!"}
 
-@app.get("/player/{player_id}/state")
-def get_world_state(player_id: str):
+@app.get("/player/{player_id}/scan")
+def get_environment_scan(player_id: str):
     """
-    Returns the game state relative to a specific player's perspective.
-    
-    It fetches a view of the game world (including nearby objects, player state, etc.)
-    that is relative to the specified player.
-    
-    Args:
-        player_id (str): The identifier of the player.
-    
-    Returns:
-        dict: Relative game state or error if the player is not found.
-    
-    Raises:
-        HTTPException: If the player is not found.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
     try:
-        state = game_world_instance.get_relative_state_for_player(player_id)
+        state = game_world_instance.scan_environment(player_id)
         return state
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.get("/player/{player_id}/player-state")
+def get_player_state(player_id: str):
+    """
+    """
+    if player_id not in game_world_instance.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+    try:
+        state = game_world_instance.player_state(player_id)
+        return state
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.get("/player/{player_id}/game-state")
+def get_game_state(player_id: str):
+    """
+    """
+    if player_id not in game_world_instance.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+    try:
+        state = game_world_instance.game_state(player_id)
+        return state
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
 
 @app.post("/player/ready/{player_id}")
 async def ready_to_play(player_id: str):
@@ -90,8 +102,7 @@ async def connect_player():
         dict: Contains the new player's ID and the initial game state.
     """
     player_id = game_world_instance.add_player()
-    initial_state = game_world_instance.to_dict()
-    return {"player_id": player_id, "initial_state": initial_state}
+    return {"player_id": player_id}
 
 @app.post("/disconnect/{player_id}")
 async def disconnect_player(player_id: str):
