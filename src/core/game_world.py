@@ -212,11 +212,10 @@ class GameWorld:
 
     def check_if_all_players_ready(self):
         """
-        Prüft, ob alle verbundenen Spieler bereit sind.
-        Wenn ja und noch kein Countdown läuft, wird der Countdown gestartet.
-        Diese Methode blockiert NICHT mehr mit time.sleep.
+        Checks if all connected players are ready.
+        If yes and no countdown is active, starts the countdown.
         """
-        if not self.players: # Keine Spieler, also nicht bereit und kein Countdown
+        if not self.players:  # Keine Spieler
             self.waiting_for_players = True
             self.game_started = False
             self.countdown_active = False
@@ -225,27 +224,26 @@ class GameWorld:
         all_currently_ready = all(player.ready for player in self.players.values())
 
         if all_currently_ready and self.waiting_for_players and not self.countdown_active:
-            # Alle Bedingungen erfüllt, um den Countdown zu STARTEN
             print("All players ready! Starting countdown...")
             self.countdown_active = True
             self.countdown_seconds_remaining = COUNTDOWN_DURATION
-            self.waiting_for_players = False # Wechsel in den Countdown-Modus
+            self.waiting_for_players = False
             for player in self.players.values():
                 player.spawn_protection_until = time.time() + player.spawn_protection_duration + COUNTDOWN_DURATION
         elif not all_currently_ready and self.countdown_active:
-            # Jemand wurde während des Countdowns unready (z.B. Disconnect)
             print("Not all players ready during countdown. Resetting to waiting state.")
             self.countdown_active = False
             self.waiting_for_players = True
-            # game_started bleibt False
         elif not all_currently_ready and not self.game_started:
-            # Allgemeiner Fall: Nicht alle bereit, kein Countdown, Spiel nicht gestartet -> Wartezustand sicherstellen
             self.waiting_for_players = True
-            self.game_started = False # Sicherstellen, dass Spiel nicht als gestartet markiert ist
+            self.game_started = False
 
         return all_currently_ready
 
     def player_ready(self, player_id):
+        """
+        Marks a player as ready and checks if all players are ready.
+        """
         player = self.players.get(player_id)
         if player:
             if self.game_started:
@@ -255,7 +253,7 @@ class GameWorld:
             if not player.ready:
                 player.ready = True
                 print(f"Player {player_id} is now ready.")
-                self.check_if_all_players_ready() # Prüfen, ob Countdown gestartet werden kann
+                self.check_if_all_players_ready()  # Prüft, ob der Countdown gestartet werden kann
             else:
                 print(f"Player {player_id} was already ready.")
         else:

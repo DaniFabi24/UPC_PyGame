@@ -88,6 +88,22 @@ class Agent:
         except requests.exceptions.RequestException as e:
             print(f"Error sending action '{action_path}': {e}")
 
+    def set_ready(self):
+        """
+        Signals to the server that the agent is ready to start the game.
+        """
+        if not self.player_id:
+            print("Player ID not set. Cannot signal readiness.")
+            return
+        try:
+            response = requests.post(f"{API_URL}/player/{self.player_id}/ready")
+            if response.status_code == 200:
+                print(f"Player {self.player_id} is now ready.")
+            else:
+                print(f"Failed to set player {self.player_id} as ready: {response.text}")
+        except requests.exceptions.RequestException as e:
+            print(f"Error signaling readiness: {e}")
+
     def get_state(self):
         """
         Retrieves the current game state relative to the agent's player.
@@ -178,4 +194,5 @@ class Agent:
 
 if __name__ == "__main__":
     agent = Agent()
+    agent.set_ready() # Signalizes server that the agent is ready to play.
     agent.run()

@@ -90,14 +90,16 @@ async def get_overall_game_state(player_id: str):
         raise HTTPException(status_code=404, detail=f"Could not retrieve game state for player {player_id}.")
     return state_data
 
-@app.post("/player/ready/{player_id}")
+@app.post("/player/{player_id}/ready")
 async def ready_to_play(player_id: str):
     """
+    Marks a player as ready to start the game.
+
     Args:
         player_id (str): The identifier of the player.
     
     Returns:
-    
+            
     Raises:
         HTTPException: If the player is not found.
     """
