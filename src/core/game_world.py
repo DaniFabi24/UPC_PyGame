@@ -299,7 +299,7 @@ class GameWorld:
         if not self.game_started: return
         player = self.players.get(player_id)
         if player:
-            player.body.angle += PLAYER_ROTATION
+            player.body.angular_velocity += PLAYER_ROTATION
 
     def left_player_rotation(self, player_id):
         """
@@ -311,7 +311,7 @@ class GameWorld:
         if not self.game_started: return
         player = self.players.get(player_id)
         if player:
-            player.body.angle -= PLAYER_ROTATION
+            player.body.angular_velocity -= PLAYER_ROTATION
 
     def shoot(self, player_id):
         """
