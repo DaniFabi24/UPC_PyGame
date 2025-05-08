@@ -1,11 +1,13 @@
 #!/bin/bash
 
+# This script starts the UPC_PyGame simulation by launching the server and agents.
+
 # Start main.py in the background
 echo "Starting game (main.py)..."
 python3 main.py &
 MAIN_PID=$!
 
-# Small delay to give the server time to start
+# Wait briefly for the server to start
 sleep 8
 
 # Ask the user how many agents to start

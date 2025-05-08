@@ -7,25 +7,32 @@
 
 ## Overview
 
-UPC_PyGame is a 2D multiplayer arena shooter simulation developed as part of the Python course at UPC_ETSEIB. It features a FastAPI-based server that manages the game state and physics simulation using Pymunk. Agents connect via an HTTP API to control their players, while a Pygame-based visualizer displays the real-time state of the game world.
+UPC_PyGame is a 2D multiplayer arena shooter simulation. This project integrates a robust FastAPI server to manage the game state and employs the Pymunk physics engine for realistic interactions within the game world. Players are represented by autonomous agents that connect to the server via a straightforward HTTP API, allowing them to control their unique spacecraft. A Pygame-based visualizer provides a real-time graphical representation of the arena, displaying the dynamic interactions between players, obstacles, and projectiles.
 
-This project serves as a demonstration platform and a basis for agent-based competitions.
+## Game Rules
+
+The objective is to be the last surviving player in the arena.
+
+* **Setup:** Players connect as agents to control their unique, colored triangular spacecraft. The arena is populated with static circular obstacles and is enclosed by reflective energy boundaries.
+* **Game Start:** Once all connected players in the pre-game lobby have indicated their readiness to compete, the game server initiates a countdown sequence, signaling the imminent start of the match.
+* **Gameplay:** Players pilot their spacecraft using directional thrust for movement and rotational commands for aiming. Skillful navigation is crucial to avoid collisions with both the static obstacles scattered throughout the arena and the dynamic boundaries that enclose the play space. Strategic positioning is key to engaging opposing players effectively.
+* **Combat:** The primary form of interaction between players is through the firing of colored energy projectiles. These projectiles travel in a straight line from the firing player's spacecraft. Direct hits on an opponent's spacecraft inflict damage, gradually reducing their overall health. To ensure a fair initial engagement, a temporary period of invulnerability and shooting restriction is applied immediately after a player enters the arena (spawn protection).
+* **Elimination:** When a player's spacecraft sustains enough damage to deplete their health to zero, they are considered eliminated from the current game round. Their agent will no longer be able to control their spacecraft.
+* **Winning:** The victor of a game round is the final player whose spacecraft remains operational (i.e., with health greater than zero) after all other players have been eliminated.
 
 ## Features
 
-*   **Multiplayer:** Supports multiple agents connecting and controlling players simultaneously.
-*   **Physics Simulation:** Uses the Pymunk 2D physics library for realistic movement, collisions, and bouncing.
-*   **API Control:** Agents interact with the game world through a simple HTTP API built with FastAPI.
-*   **Real-time Visualization:** A Pygame window displays the current state of the arena, including players, obstacles and projectiles.
-*   **Player Mechanics:**
-    *   Triangle-shaped players with unique colors.
-    *   Health system with damage from projectiles and obstacles (obstacle damage currently disabled in handler).
-    *   Spawn protection period.
-    *   Ability to shoot projectiles (colored based on the player).
-*   **Game Elements:**
-    *   Static circular obstacles.
-    *   Arena boundaries.
-*   **Relative State Information:** Agents can query the game state relative to their own position and orientation.
+* **Multiplayer Support:** Facilitates simultaneous participation of numerous players, each controlled by an independent agent.
+* **Realistic 2D Physics:** Leverages the Pymunk library to simulate accurate and responsive movement, collisions, and ricochets for all interactive elements within the game.
+* **Intuitive HTTP API:** Offers a straightforward and well-documented interface built with FastAPI, enabling agents to easily send control commands and receive comprehensive game state updates.
+* **Real-time Visualizer:** Provides a dynamic Pygame-based graphical representation of the game arena, allowing for immediate observation of all in-game actions and states.
+* **Distinct Player Entities:** Features uniquely colored, triangular spacecraft for each player, enhancing visual clarity and identification within the arena.
+* **Projectile-Based Combat:** Implements a core combat mechanic where players can launch colored projectiles to engage and damage opponents.
+* **Strategic Obstacles:** Populates the arena with static circular obstacles that serve as both tactical cover and navigational challenges.
+* **Dynamic Arena Boundaries:** Defines the play area with energy field boundaries that cause spacecraft and projectiles to bounce realistically upon contact.
+* **Comprehensive Relative State Information:** Equips agents with detailed sensory data about their immediate surroundings, including the position, velocity, and type of nearby entities.
+* **Pre-Game Readiness System:** Ensures all participating players are prepared before a match begins through a mandatory readiness signaling mechanism.
+* **Initial Spawn Protection:** Grants newly spawned players a temporary period of invulnerability and firing restriction to prevent immediate elimination.
 
 ## Architecture
 
@@ -71,71 +78,83 @@ The system consists of three main components:
     pip install -r requirements.txt
     ```
 
-## Running the Simulation at once (with `run_game.sh`)
+## Running the Simulation
 
-To quickly start the full simulation (server, visualizer, and multiple agents) in one step:
+You have two main ways to run the simulation: all at once using the `run_game.sh` script, or step by step by manually launching the server and then the agents.
 
-1. **Ensure the script is executable:** 
+### Running the Simulation at once (with `run_game.sh`)
 
-```bash
-chmod +x run_game.sh
-```
-(You only need to do this once.)
+This script provides a convenient way to start the entire simulation, including the server, visualizer, and a specified number of agents, in one go.
 
-2. **Run the game:**
+1.  **Ensure the script is executable:**
+    ```bash
+    chmod +x run_game.sh
+    ```
+    (You only need to do this once.)
 
-```bash
-./run_game.sh
-```
-After launching, you will be asked how many agents you want to start.
-Once you enter a number and press Enter, the script will:
+2.  **Run the game:**
+    ```bash
+    ./run_game.sh
+    ```
+    After launching, the script will first print "Starting game (main.py)..." and start the FastAPI server and Pygame visualizer in the background. It will then pause for 8 seconds to allow the server sufficient time to initialize.
 
-- launch the FastAPI server in the background,
+3.  **Enter the number of agents:**
+    You will be prompted with the message "How many agents do you want to start? ". Enter the desired number of agents and press Enter.
 
-- open the Pygame visualizer window,
+4.  **Agent startup:**
+    The script will then proceed to start the specified number of `dummy_agent.py` instances in the background. Each agent will connect to the running game server.
 
-- and automatically start the specified number of agents in parallel.
+5.  **Termination:**
+    The script will wait for the `main.py` process (server and visualizer) to finish before the `run_game.sh` script itself terminates. You can typically close the visualizer window to end the entire simulation.
 
+### Running the Simulation step by step
 
-## Running the Simulation step by step
+This method allows for more control over the startup process and is useful for debugging or when you want to start agents individually.
 
 1.  **Start the Server and Visualizer:**
-    Run the main script. This starts the FastAPI server in a background thread and then launches the Pygame visualizer in the main thread.
+    Open a terminal in the project root (where `main.py` is located) and run the main script:
     ```bash
     python main.py
     ```
-    Wait for the console output indicating the server is running and the visualizer window to appear.
+    Wait for the console output indicating the server is running and the visualizer window to appear. The server runs in a background thread initiated by `main.py`, and the visualizer runs in the main thread.
 
 2.  **Run Agent(s):**
-    *After* the server and visualizer are running, open one or more *separate* terminal windows (ensure the virtual environment is activated in each). In each terminal, run the dummy agent script:
+    *After* the server and visualizer are running, open one or more *separate* terminal windows (ensure the virtual environment is activated in each). In each terminal, navigate to the project root and run the dummy agent script:
     ```bash
     python dummy_agent.py
     ```
-    Each execution will connect a new agent/player to the game.
+    Each execution of this command will connect a new agent/player to the already running game server. You can run this command multiple times to add more agents.
+
 
 ## Agent Control (`dummy_agent.py`)
 
-Use the following keys in the Pygame window created by `dummy_agent.py` to control your player:
+The `dummy_agent.py` script uses a Pygame window to capture key presses and send corresponding actions to the server.
 
-*   **Spacebar:** Shoot a projectile.
-*   **Arrow Up:** Apply forward thrust.
-*   **Arrow Down:** Apply backward thrust (brake/reverse).
-*   **Arrow Left:** Rotate the player left.
-*   **Arrow Right:** Rotate the player right.
-*   **Enter Key:** Request and print the current relative game state to the agent's console.
+* **Spacebar:** Shoot a projectile.
+* **Arrow Up:** Apply forward thrust.
+* **Arrow Down:** Apply backward thrust (brake/reverse).
+* **Arrow Left:** Rotate the player left.
+* **Arrow Right:** Rotate the player right.
+* **Enter Key:** Request and print the current relative game state from the `/player/{player_id}/scan` endpoint to the agent's console.
+* **Right Shift Key:** Send a "ready" signal to the server (`/player/ready/{player_id}`).
+* **Left Shift Key:** Request and print the current game state from the `/player/{player_id}/game-state` endpoint to the agent's console.
+* **Left Control Key:** Request and print the player's state from the `/player/{player_id}/state` endpoint to the agent's console.
 
 ## API Overview
 
 The FastAPI server exposes the following key endpoints for agent interaction (base URL defined in [`src/settings.py`](.\src\settings.py)):
 
-*   `POST /connect`: Connects a new agent, returns a unique `player_id`.
-*   `POST /disconnect/{player_id}`: Disconnects the specified player.
-*   `GET /player/{player_id}/state`: Retrieves the game state relative to the specified player (includes nearby objects, velocity, health).
-*   `POST /player/{player_id}/thrust_forward`: Applies forward thrust.
-*   `POST /player/{player_id}/thrust_backward`: Applies backward thrust.
-*   `POST /player/{player_id}/rotate_left`: Applies left rotation torque.
-*   `POST /player/{player_id}/rotate_right`: Applies right rotation torque.
-*   `POST /player/{player_id}/shoot`: Fires a projectile.
+* `POST /connect`: Connects a new agent, returns a unique `player_id`.
+* `POST /disconnect/{player_id}`: Disconnects the specified player.
+* `GET /player/{player_id}/state`: Retrieves the player's specific state (includes velocity, health, etc.).
+* `GET /player/{player_id}/game-state`: Retrieves the overall state of the game (e.g., other players, obstacles).
+* `GET /player/{player_id}/scan`: Retrieves the game state relative to the specified player (includes nearby objects, velocity, health).
+* `POST /player/{player_id}/thrust_forward`: Applies forward thrust.
+* `POST /player/{player_id}/thrust_backward`: Applies backward thrust.
+* `POST /player/{player_id}/rotate_left`: Applies left rotation torque.
+* `POST /player/{player_id}/rotate_right`: Applies right rotation torque.
+* `POST /player/{player_id}/shoot`: Fires a projectile.
+* `POST /player/ready/{player_id}`: Signals that a player is ready to start a game (potentially for future game modes).
 
 *(Refer to [`src/api/api_endpoints.py`](.\src\api\api_endpoints.py) for implementation details)*
 

@@ -8,28 +8,41 @@ from ..settings import PHYSICS_DT
 
 app = FastAPI()
 
-# Allow cross-origin requests (useful for client/websocket connections)
+# Allow cross-origin requests (for client/websocket connections)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # Allow requests from any origin
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # --- Cooldown Management ---
-# Einfache In-Memory-Speicherung für Cooldowns. Für Produktion ggf. Redis o.ä. verwenden.
-# Struktur: { "player_id": { "endpoint_name": last_call_timestamp }}
+# Simple in-memory storage for cooldowns.  Consider Redis for production.
+# Structure: { "player_id": { "endpoint_name": last_call_timestamp }}
 player_cooldowns = {}
 
-# Cooldown-Dauern in Sekunden
+# Cooldown durations (in seconds)
 COOLDOWN_SCAN_ENVIRONMENT = 0.5
 COOLDOWN_PLAYER_STATE = 0.5
 COOLDOWN_GAME_STATE = 0.5
 COOLDOWN_SHOOT = 0.1
 
 def check_cooldown(player_id: str, endpoint_name: str, cooldown_duration: float):
-    """Prüft und aktualisiert den Cooldown für einen Spieler und Endpunkt."""
+    """
+    Checks and updates the cooldown for a player and endpoint.
+
+    Args:
+        player_id: The ID of the player.
+        endpoint_name: The name of the endpoint being accessed.
+        cooldown_duration: The cooldown duration in seconds.
+
+    Returns:
+        True if the cooldown has passed.
+
+    Raises:
+        HTTPException: (429 Too Many Requests) if the cooldown is still active.
+    """
     now = time.time()
     if player_id not in player_cooldowns:
         player_cooldowns[player_id] = {}
@@ -39,18 +52,18 @@ def check_cooldown(player_id: str, endpoint_name: str, cooldown_duration: float)
     if now - last_call < cooldown_duration:
         remaining_cooldown = cooldown_duration - (now - last_call)
         raise HTTPException(
-            status_code=429, # Too Many Requests
-            detail=f"Cooldown active: {endpoint_name}. Wait {remaining_cooldown:.2f} seconds."
+            status_code=429,  # Too Many Requests
+            detail=f"Cooldown active: {endpoint_name}. Wait {remaining_cooldown:.2f} seconds.",
         )
     player_cooldowns[player_id][endpoint_name] = now
-    return True # Cooldown bestanden
+    return True  # Cooldown passed
 
 @app.on_event("startup")
 async def startup_event():
     """
     Startup event handler that starts the physics engine.
-    
-    This event runs when the FastAPI application starts. It initializes and starts the 
+
+    This event runs when the FastAPI application starts. It initializes and starts the
     physics loop (using PHYSICS_DT as the delta time) in the game world.
     """
     print("Startup event: Starting physics engine")
@@ -61,13 +74,25 @@ async def startup_event():
 def read_root():
     """
     Root endpoint.
-    
-    Returns a simple welcome message to indicate that the API is running.
+
+    Returns a simple welcome message.
     """
     return {"message": "Welcome to the UPC Game API with WebSockets!"}
 
 @app.get("/player/{player_id}/scan")
 async def get_scan_environment(player_id: str):
+    """
+    Retrieves the game state relative to a specific player.
+
+    Args:
+        player_id: The ID of the player.
+
+    Returns:
+        The scan data.
+
+    Raises:
+        HTTPException: (429) if the cooldown is active.
+    """
     check_cooldown(player_id, "scan_environment", COOLDOWN_SCAN_ENVIRONMENT)
     scan_data = game_world_instance.scan_environment(player_id)
     if scan_data is None:
@@ -76,30 +101,63 @@ async def get_scan_environment(player_id: str):
 
 @app.get("/player/{player_id}/state")
 async def get_player_own_state(player_id: str):
+    """
+    Retrieves the state of a specific player.
+
+    Args:
+        player_id: The ID of the player.
+
+    Returns:
+        The player's state data.
+
+    Raises:
+        HTTPException: (429) if the cooldown is active, (404) if player not found.
+    """
     check_cooldown(player_id, "state", COOLDOWN_PLAYER_STATE)
     state_data = game_world_instance.player_state(player_id)
     if state_data is None:
-        raise HTTPException(status_code=404, detail=f"Player {player_id} not found or no state available.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Player {player_id} not found or no state available.",
+        )
     return state_data
 
 @app.get("/player/{player_id}/game-state")
 async def get_overall_game_state(player_id: str):
+    """
+    Retrieves the overall game state.
+
+    Args:
+        player_id: The ID of the player.  (Currently not used, but kept for consistency).
+
+    Returns:
+        The overall game state.
+
+    Raises:
+        HTTPException: (429) if the cooldown is active, (404) if game state cannot be retrieved.
+    """
     check_cooldown(player_id, "game_state", COOLDOWN_GAME_STATE)
     state_data = game_world_instance.game_state(player_id)
     if state_data is None:
-        raise HTTPException(status_code=404, detail=f"Could not retrieve game state for player {player_id}.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not retrieve game state for player {player_id}.",
+        )
     return state_data
 
 @app.post("/player/ready/{player_id}")
 async def ready_to_play(player_id: str):
     """
+    Sets a player's readiness status.
+
     Args:
-        player_id (str): The identifier of the player.
-    
+        player_id: The ID of the player.
+
     Returns:
-    
+        A message indicating the player is ready.
+
     Raises:
-        HTTPException: If the player is not found.
+        HTTPException: (404) if the player is not found.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -110,12 +168,9 @@ async def ready_to_play(player_id: str):
 async def connect_player():
     """
     Connects a new player to the game.
-    
-    This endpoint adds a new player to the game world, assigns a unique player ID, and returns
-    an initial snapshot of the game state.
-    
+
     Returns:
-        dict: Contains the new player's ID and the initial game state.
+        The new player's ID.
     """
     player_id = game_world_instance.add_player()
     return {"player_id": player_id}
@@ -124,17 +179,15 @@ async def connect_player():
 async def disconnect_player(player_id: str):
     """
     Disconnects a player from the game.
-    
-    Removes the specified player from the game world.
-    
+
     Args:
-        player_id (str): The unique identifier of the player.
-    
+        player_id: The ID of the player to disconnect.
+
     Returns:
-        dict: A message confirming that the player was disconnected.
-    
+        A message confirming disconnection.
+
     Raises:
-        HTTPException: If the player is not found.
+        HTTPException: (404) if the player is not found.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -144,18 +197,16 @@ async def disconnect_player(player_id: str):
 @app.post("/player/{player_id}/thrust_forward")
 async def thrust_forward(player_id: str):
     """
-    Applies forward thrust to the specified player.
-    
-    This will increase the player's velocity in the direction they are currently facing.
-    
+    Applies forward thrust to a player.
+
     Args:
-        player_id (str): The identifier of the player.
-    
+        player_id: The ID of the player.
+
     Returns:
-        dict: A message confirming the thrust action.
-    
+        A confirmation message.
+
     Raises:
-        HTTPException: If the player is not found.
+        HTTPException: (404) if the player is not found.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -165,16 +216,16 @@ async def thrust_forward(player_id: str):
 @app.post("/player/{player_id}/rotate_right")
 async def rotate_right(player_id: str):
     """
-    Rotates the specified player to the right.
-    
+    Rotates a player to the right.
+
     Args:
-        player_id (str): The identifier of the player.
-    
+        player_id: The ID of the player.
+
     Returns:
-        dict: A message confirming the rotation action.
-    
+        A confirmation message.
+
     Raises:
-        HTTPException: If the player is not found.
+        HTTPException: (404) if the player is not found.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -184,18 +235,16 @@ async def rotate_right(player_id: str):
 @app.post("/player/{player_id}/shoot")
 async def shoot(player_id: str):
     """
-    Initiates a shooting action for the specified player.
-    
-    A projectile is created and added to the game world.
-    
+    Initiates a shooting action for a player.
+
     Args:
-        player_id (str): The identifier of the player who is shooting.
-    
+        player_id: The ID of the player.
+
     Returns:
-        dict: A message confirming that the player has shot.
-    
+        A confirmation message.
+
     Raises:
-        HTTPException: If the player is not found.
+        HTTPException: (404) if the player is not found, (429) if cooldown active.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -206,16 +255,16 @@ async def shoot(player_id: str):
 @app.post("/player/{player_id}/thrust_backward")
 async def thrust_backward(player_id: str):
     """
-    Applies backward thrust (braking) to the specified player.
-    
+    Applies backward thrust to a player.
+
     Args:
-        player_id (str): The identifier of the player.
-    
+        player_id: The ID of the player.
+
     Returns:
-        dict: A confirmation message.
-    
+        A confirmation message.
+
     Raises:
-        HTTPException: If the player is not found.
+        HTTPException: (404) if the player is not found.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -225,19 +274,18 @@ async def thrust_backward(player_id: str):
 @app.post("/player/{player_id}/rotate_left")
 async def rotate_left(player_id: str):
     """
-    Rotates the specified player to the left.
-    
+    Rotates a player to the left.
+
     Args:
-        player_id (str): The identifier of the player.
-    
+        player_id: The ID of the player.
+
     Returns:
-        dict: A message confirming the left rotation.
-    
+        A confirmation message.
+
     Raises:
-        HTTPException: If the player is not found.
+        HTTPException: (404) if the player is not found.
     """
     if player_id not in game_world_instance.players:
         raise HTTPException(status_code=404, detail="Player not found")
     game_world_instance.left_player_rotation(player_id)
     return {"message": f"Player {player_id} rotated left"}
-

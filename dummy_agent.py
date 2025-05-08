@@ -11,15 +11,17 @@ Dependencies:
 
 import pygame  # Used for creating a window, handling display and key events.
 import requests  # Used for making HTTP requests to the game server.
-import sys       # Used for exit() on critical errors.
-import json      # Used for pretty-printing JSON responses.
+import sys  # Used for exit() on critical errors.
+import json  # Used for pretty-printing JSON responses.
 from src.settings import API_URL  # API base URL for communicating with the server.
+
 
 class Agent:
     """
     Represents a dummy game agent that connects to the game server,
     sends control actions, and prints the relative game state.
     """
+
     def __init__(self):
         """
         Initializes the agent and connects to the server to obtain a player ID.
@@ -65,9 +67,9 @@ class Agent:
     def send_action(self, action_path):
         """
         Sends an action command to the server for the current player.
-        
+
         The action_path should match one of the API endpoints (e.g. "shoot", "thrust_forward").
-        
+
         Args:
             action_path (str): The action to perform.
         """
@@ -77,12 +79,15 @@ class Agent:
         try:
             url = f"{API_URL}/player/{self.player_id}/{action_path}"
             response = requests.post(url)
-            
+
             # Handle 404 errors (player not found)
             if response.status_code == 404:
-                print(f"Error: Player ID '{self.player_id}' not found on server. Stopping actions.")
+                print(
+                    f"Error: Player ID '{self.player_id}' not found on server. "
+                    "Stopping actions."
+                )
                 self.player_id = None  # Reset the player ID.
-                return 
+                return
             response.raise_for_status()  # Will raise an exception for other HTTP error codes.
             # Optional quiet output: print(f"Action '{action_path}' sent.")
         except requests.exceptions.RequestException as e:
@@ -91,10 +96,10 @@ class Agent:
     def get_state(self):
         """
         Retrieves the current game state relative to the agent's player.
-        
+
         Calls the '/player/{player_id}/state' endpoint using a GET request to obtain the state.
         Pretty prints the JSON response.
-        
+
         Returns:
             dict or None: The game state if successful; otherwise, None.
         """
@@ -120,7 +125,7 @@ class Agent:
     def run(self):
         """
         Runs the agent's main loop.
-        
+
         Initializes a small pygame window. Uses key events to send control actions to the server.
         SPACE sends a shoot action, arrow keys control movement and rotation, and ENTER polls for state.
         The loop continues until the window is closed or the player ID is lost.
@@ -143,7 +148,7 @@ class Agent:
                     if event.key == pygame.K_SPACE:
                         self.send_action("shoot")
                     # ENTER key polls for the current game state.
-                    elif event.key == pygame.K_RETURN: 
+                    elif event.key == pygame.K_RETURN:
                         response = requests.get(f"{API_URL}/player/{self.player_id}/scan")
                         print(f"Game-State: {response.json()}")
                     elif event.key == pygame.K_RSHIFT:
@@ -156,14 +161,13 @@ class Agent:
                         response = requests.get(f"{API_URL}/player/{self.player_id}/state")
                         print(f"Player-State: {response.json()}")
 
-
             # Continuous action sending based on key hold status.
             if self.player_id:
                 keys = pygame.key.get_pressed()
                 if keys[pygame.K_UP]:
                     self.send_action("thrust_forward")
                 elif keys[pygame.K_DOWN]:
-                    self.send_action("thrust_backward") 
+                    self.send_action("thrust_backward")
 
                 if keys[pygame.K_LEFT]:
                     self.send_action("rotate_left")
@@ -175,6 +179,7 @@ class Agent:
         # When finished, disconnect from the server and quit pygame.
         self.disconnect()
         pygame.quit()
+
 
 if __name__ == "__main__":
     agent = Agent()
