@@ -13,24 +13,17 @@ MAIN_PID=$!
 # Wait briefly for the server to start
 sleep 8
 
-# List available agents in the "agents" folder
+# List all available agents in the "agents" folder
 AGENTS_DIR="./agents"
-echo "Available agents in $AGENTS_DIR:"
-AGENT_FILES=$(ls $AGENTS_DIR/agent*.py)
+echo "Automatically detecting agents in $AGENTS_DIR..."
+AGENT_FILES=$(ls $AGENTS_DIR/*.py)
+echo "Detected agents:"
 echo "$AGENT_FILES"
 
-# Ask the user to select agents
-read -p "Enter the names of the agents to start (separated by spaces, e.g., agent1.py agent2.py): " SELECTED_AGENTS
-
-# Start the selected agents
-for AGENT in $SELECTED_AGENTS; do
-    AGENT_PATH="$AGENTS_DIR/$AGENT"
-    if [[ -f $AGENT_PATH ]]; then
-        echo "Starting $AGENT..."
-        python3 $AGENT_PATH &
-    else
-        echo "Error: $AGENT not found in $AGENTS_DIR!"
-    fi
+# Start all detected agents
+for AGENT_PATH in $AGENT_FILES; do
+    echo "Starting $(basename $AGENT_PATH)..."
+    python3 $AGENT_PATH &
 done
 
 # Wait for main.py to finish
