@@ -139,7 +139,13 @@ class Triangle(pygame.sprite.Sprite):
         print(f"Player {self.player_id} took {amount} damage. Current health: {self.health}")
         if self.health <= 0:
             print(f"Player {self.player_id} destroyed!")
-            self.remove_from_world()
+            if self.game_world:
+                if self.body in self.game_world.space.bodies:
+                    self.game_world.space.remove(self.body)
+                if self.shape in self.game_world.space.shapes:
+                    self.game_world.space.remove(self.shape)
+                if self in self.game_world.objects:
+                    self.game_world.objects.remove(self)
 
     def remove_from_world(self):
         """
@@ -308,6 +314,7 @@ class Projectile(pygame.sprite.Sprite):
             if self in self.game_world.objects:
                 self.game_world.objects.remove(self)
             self.kill()  # Remove sprite from all groups
+    
 
     def to_dict(self):
         """

@@ -60,12 +60,12 @@ class GameWorld:
         self.initialize_world_objects() # *** HINDERNISSE SOFORT INITIALISIEREN ***
         self.initialize_collision_handlers() # Kollisionshandler auch früh initialisieren
 
-    def add_player(self):
+    def add_player(self, given_player_id=None):
         """
         Creates and adds a new player to the game.
         
-        It attempts to find a safe spawn position (without collisions with existing players/obstacles)
-        and assigns a unique ID and a pre-defined color to the player.
+        Attempts to find a safe spawn position (without collisions).
+        If given_player_id is provided, it is used; otherwise, a new UUID is generated.
         
         Returns:
             str or None: The player's unique ID if spawn is successful; otherwise, None.
@@ -73,16 +73,13 @@ class GameWorld:
         if self.game_started:
             print("Game has already started. No new players can join.")
             return None
-        # Spieler können während des Countdowns beitreten. Sie starten als 'nicht bereit'.
-        # Die finale Prüfung am Ende des Countdowns wird dies berücksichtigen.
 
-        player_id = str(uuid.uuid4())
+        player_id = given_player_id if given_player_id is not None else str(uuid.uuid4())
         max_attempts = 10
         safe_spawn_pos = None
         player_radius = 15
 
         for attempt in range(max_attempts):
-            # For the first attempt, use the center of the screen; afterwards, random positions.
             if attempt == 0:
                 potential_pos = pymunk.Vec2d(self.width / 2, self.height / 2)
             else:
@@ -92,7 +89,6 @@ class GameWorld:
                     random.uniform(pad, self.height - pad)
                 )
 
-            # Create a temporary body/shape to test for collisions.
             temp_body = pymunk.Body(body_type=pymunk.Body.KINEMATIC)
             temp_body.position = potential_pos
             temp_shape = pymunk.Poly(temp_body, [
@@ -102,36 +98,28 @@ class GameWorld:
             ])
             temp_shape.collision_type = 1
 
-            # Check for collisions with obstacles (type 2) or existing players (type 1)
-            query_info = self.space.shape_query(temp_shape)
             collision_found = False
-            colliding_type = None
-            for info in query_info:
+            for info in self.space.shape_query(temp_shape):
                 if info.shape and info.shape.collision_type in [1, 2]:
                     collision_found = True
-                    colliding_type = info.shape.collision_type
-                    print(f"Spawn attempt {attempt+1} at {potential_pos} failed: Collision with type {colliding_type}.")
+                    print(f"Spawn attempt {attempt+1} at {potential_pos} failed due to collision.")
                     break
 
             if not collision_found:
                 safe_spawn_pos = potential_pos
-                print(f"Spawn attempt {attempt+1}: Found safe position at {safe_spawn_pos}")
+                print(f"Spawn attempt {attempt+1}: Safe position at {safe_spawn_pos} found.")
                 break
 
         if safe_spawn_pos:
-            # Choose the next available color for the new player.
             player_color = PLAYER_COLORS[self.next_color_index % len(PLAYER_COLORS)]
             self.next_color_index += 1
-
-            # Create a new Triangle (player) with chosen color and safe spawn position.
             new_player = Triangle(safe_spawn_pos, color=player_color, game_world=self)
             new_player.player_id = player_id
             self.players[player_id] = new_player
-            print(f"Player added with ID: {player_id} at {safe_spawn_pos} with color {player_color}. Spawn protection active until {new_player.spawn_protection_until:.2f}")
-            print(f"Current players in dict after add: {list(self.players.keys())}")
+            print(f"Player added with ID: {player_id} at {safe_spawn_pos} with color {player_color}.")
             return player_id
         else:
-            print(f"Error: Could not find a safe spawn position for player after {max_attempts} attempts.")
+            print(f"Error: No safe spawn position found after {max_attempts} attempts.")
             return None
 
     def remove_player(self, player_id):
@@ -389,14 +377,14 @@ class GameWorld:
                     # game_started bleibt False
             # Der Visualizer zeigt countdown_seconds_remaining an
 
-        # Spielspezifische Updates (Projektile, Power-Ups etc.) nur, wenn das Spiel gestartet ist
-        if self.game_started:
-            for shape in self.space.shapes:
-                # Spieler wurden bereits oben aktualisiert
-                if hasattr(shape, "sprite_ref") and not isinstance(shape.sprite_ref, Triangle):
-                    shape.sprite_ref.update(dt) # Projektile, PowerUps etc.
-        # Wenn game_started False ist (d.h. waiting_for_players oder countdown_active),
-        # werden diese spielspezifischen Updates übersprungen.
+        if not self.players:
+            self.game_started = False
+            self.waiting_for_players = True
+            self.countdown_active = False
+            self.countdown_seconds_remaining = 0.0
+            self.shot_count = 0
+            self.player_collisions = 0
+            self.next_color_index = 0
 
     async def _run_physics_loop(self, dt):
         """
@@ -442,6 +430,54 @@ class GameWorld:
                 self._physics_task.cancel()
                 self._physics_task = None
 
+    def restart_game(self):
+        """
+        Resets the game to its initial state.
+        
+        Removes non-player objects and resets global game state variables.
+        For each connected player, it removes the old instance and re-adds a new one using the existing player ID.
+        """
+        print("Restarting game...")
+
+        # Reset global game state variables.
+        self.game_started = False
+        self.waiting_for_players = True
+        self.countdown_active = False
+        self.countdown_seconds_remaining = 0.0
+        self.shot_count = 0
+        self.player_collisions = 0
+        self.next_color_index = 0
+
+        # Remove all non-player objects (e.g. projectiles, power-ups).
+        objects_to_remove = list(self.objects)
+        for obj in objects_to_remove:
+            if hasattr(obj, 'remove_from_world'):
+                obj.remove_from_world()
+            elif hasattr(obj, 'body') and obj.body in self.space.bodies:
+                self.space.remove(obj.body)
+                if hasattr(obj, 'shape') and obj.shape in self.space.shapes:
+                    self.space.remove(obj.shape)
+        self.objects.clear()
+
+        # Speichere bestehende Spieler (um ihre Eigenschaften ggf. später zu erhalten).
+        old_players = list(self.players.items())
+        self.players.clear()  # Leere die Spielerliste, damit add_player einen neuen Eintrag erstellen kann.
+        for player_id, old_player in old_players:
+            # Entferne alte Player-Ressourcen.
+            old_player.remove_from_world()
+            # Erzeuge einen neuen Spieler mit der alten ID und neuer Spawnposition.
+            new_player_id = self.add_player(given_player_id=player_id)
+            if new_player_id is None:
+                print(f"Failed to respawn player {player_id}.")
+            else:
+                # Optional: Alte Eigenschaften (wie Farbe) beibehalten.
+                self.players[player_id].color = old_player.color
+                print(f"Player {player_id} restarted.")
+
+        # Re-initialisiere statische Weltobjekte (z. B. Hindernisse).
+        self.initialize_world_objects()
+
+        print("Game has been reset to initial state.")
 
 
 
@@ -641,7 +677,8 @@ class GameWorld:
 
             # Always add players to the sprite group
             for player in self.players.values():
-                all_game_sprites.add(player)
+                if player.health > 0:
+                    all_game_sprites.add(player)
 
             # Add obstacles and other objects (projectiles, power-ups)
             for obj in self.objects:
@@ -656,16 +693,17 @@ class GameWorld:
             bar_width = 30; bar_height = 5; bar_offset_y = 5
             health_color = (0, 255, 0); lost_health_color = (255, 0, 0); border_color = (255, 255, 255)
             for player in self.players.values():
-                bar_x = player.rect.centerx - bar_width // 2
-                bar_y = player.rect.bottom + bar_offset_y
-                health_percentage = max(0, player.health / PLAYER_START_HEALTH)
-                background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
-                pygame.draw.rect(screen, lost_health_color, background_rect)
-                current_bar_width = int(bar_width * health_percentage)
-                if current_bar_width > 0:
-                    health_rect = pygame.Rect(bar_x, bar_y, current_bar_width, bar_height)
-                    pygame.draw.rect(screen, health_color, health_rect)
-                pygame.draw.rect(screen, border_color, background_rect, 1)
+                if player.health > 0:    
+                    bar_x = player.rect.centerx - bar_width // 2
+                    bar_y = player.rect.bottom + bar_offset_y
+                    health_percentage = max(0, player.health / PLAYER_START_HEALTH)
+                    background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+                    pygame.draw.rect(screen, lost_health_color, background_rect)
+                    current_bar_width = int(bar_width * health_percentage)
+                    if current_bar_width > 0:
+                        health_rect = pygame.Rect(bar_x, bar_y, current_bar_width, bar_height)
+                        pygame.draw.rect(screen, health_color, health_rect)
+                    pygame.draw.rect(screen, border_color, background_rect, 1)
 
             # Text display based on game state
             display_text = ""

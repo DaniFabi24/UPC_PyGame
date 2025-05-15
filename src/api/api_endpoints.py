@@ -289,3 +289,14 @@ async def rotate_left(player_id: str):
         raise HTTPException(status_code=404, detail="Player not found")
     game_world_instance.left_player_rotation(player_id)
     return {"message": f"Player {player_id} rotated left"}
+
+@app.post("/game/restart")
+async def restart_game_endpoint():
+    """
+    Resets the game to its initial state.
+    All players will be disconnected, and the game world will be reset.
+    """
+    game_world_instance.restart_game()
+    # Optionally, clear cooldowns if they should reset with the game
+    # player_cooldowns.clear()
+    return {"message": "Game restart initiated. World has been reset."}

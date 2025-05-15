@@ -160,6 +160,10 @@ class Agent:
                     elif event.key == pygame.K_LCTRL:
                         response = requests.get(f"{API_URL}/player/{self.player_id}/state")
                         print(f"Player-State: {response.json()}")
+                    elif event.key == pygame.K_ESCAPE:
+                        response = requests.post(f"{API_URL}/game/restart")
+                    elif event.key == pygame.K_1:
+                        response = requests.post(f"{API_URL}/disconnect/{self.player_id}")
 
             # Continuous action sending based on key hold status.
             if self.player_id:
