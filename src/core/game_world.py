@@ -55,7 +55,7 @@ class GameWorld:
         self.next_color_index = 0   # Index to select the next player color from PLAYER_COLORS
         self.game_started = False # Flag indicating whether the game has started
         self.waiting_for_players = True # Flag indicating whether the game is waiting for players to join
-        self.score_sys = ScoreSystem(SCORE_CONFIG)
+        self.score_sys = ScoreSystem(SCORE_CONFIG) # Initialize the score system with the provided configuration from settings.py
         # NEU: Countdown-Zustandsvariablen
         self.countdown_active = False
         self.countdown_seconds_remaining = 0.0
@@ -726,14 +726,14 @@ class GameWorld:
                         pygame.draw.rect(screen, health_color, health_rect)
                     pygame.draw.rect(screen, border_color, background_rect, 1)
 
-            # Display scoring information
-            for player in self.players.values():
-                # score_sys ist in GameWorld angelegt
-                score = self.score_sys.get_score(player.player_id)
-                score_text = font.render(f"Score: {score}", True, (255, 255, 255))
-                # Position: über dem Spieler-Avatar, z.B. 20 px darüber
-                score_rect = score_text.get_rect(center=(player.rect.centerx, player.rect.top - 10))
-                screen.blit(score_text, score_rect)
+            # # Display scoring information
+            # for player in self.players.values():
+            #     # score_sys ist in GameWorld angelegt
+            #     score = self.score_sys.get_score(player.player_id)
+            #     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+            #     # Position: über dem Spieler-Avatar, z.B. 20 px darüber
+            #     score_rect = score_text.get_rect(center=(player.rect.centerx, player.rect.top - 10))
+            #     screen.blit(score_text, score_rect)
 
             # Text display based on game state
             display_text = ""
@@ -754,18 +754,12 @@ class GameWorld:
                 screen.blit(text_surface, text_rect)
 
 
-            # --- Dynamic fancy score box visualization for all players ---
-            if not hasattr(self, "scores"):
-                self.scores = {}
-            for pid in self.players:
-                if pid not in self.scores:
-                    self.scores[pid] = 0
-
+            # Display scoring information
             score_strings = []
             for pid, player in self.players.items():
                 color = player.color if hasattr(player, "color") else (255,255,255)
                 agent_name = getattr(player, "agent_name", pid[:6])
-                score = self.scores.get(pid, 0)
+                score = self.score_sys.get_score(pid)  # <-- ScoreSystem verwenden!
                 score_strings.append((f"{agent_name}: {score}", color))
 
             # Layout: max 4 scores per row, then wrap
