@@ -1,6 +1,7 @@
 class ScoreSystem:
     def __init__(self, config):
         self.kill_points       = config["kill_points"]
+        self.hit_points        = config["hit_points"]
         self.collision_penalty = config["collision_penalty"]
         self.shot_penalty      = config["shot_penalty"]
         self.life_penalty      = config["life_penalty"]
@@ -11,6 +12,9 @@ class ScoreSystem:
 
     def on_kill(self, killer_id):
         self.scores[killer_id] += self.kill_points
+
+    def on_hit(self, agent_id):
+        self.scores[agent_id] += self.hit_points
 
     def on_collision(self, agent_id):
         self.scores[agent_id] -= self.collision_penalty

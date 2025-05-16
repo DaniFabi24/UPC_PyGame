@@ -431,6 +431,14 @@ def projectile_hit_player(arbiter, space, data):
 
     print(f"Player hit by projectile! Applying {PROJECTILE_DAMAGE} damage.")
     player.take_damage(PROJECTILE_DAMAGE)
+    # Points for hitting a player
+    if game_world and projectile.owner and hasattr(projectile.owner, "player_id"):
+        shooter_id = projectile.owner.player_id
+        game_world.score_sys.on_hit(shooter_id)
+    # Points for killing a player
+    if player.health <= 0 and game_world and projectile.owner and hasattr(projectile.owner, "player_id"):
+        killer_id = projectile.owner.player_id
+        game_world.score_sys.on_kill(killer_id)
     projectile.remove_from_world()
     return True
 

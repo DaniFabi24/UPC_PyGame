@@ -38,6 +38,7 @@ COUNTDOWN_DURATION = 3.0  # Dauer des Countdowns in Sekunden, bevor das Spiel st
 # --- Score System Configuration ---
 SCORE_CONFIG = {
     "kill_points": 10,          # Points awarded for killing another player
+    "hit_points": 1,            # Points awarded for hitting another player with a projectile
     "collision_penalty": 5,     # Points deducted for colliding with another player
     "shot_penalty": 1,          # Points deducted for firing a shot
     "life_penalty": 1           # Points deducted for each remaining life point at the end of the game
