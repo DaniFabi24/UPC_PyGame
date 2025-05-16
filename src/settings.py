@@ -34,3 +34,24 @@ OBSTACLE_DAMAGE = 1             # Amount of health points deducted when a player
 
 # --- Countdown Configuration ---
 COUNTDOWN_DURATION = 3.0  # Dauer des Countdowns in Sekunden, bevor das Spiel startet
+
+# --- Score System Configuration ---
+SCORE_CONFIG = {
+    "kill_points": 10,          # Points awarded for killing another player
+    "collision_penalty": 5,     # Points deducted for colliding with another player
+    "shot_penalty": 2,          # Points deducted for firing a shot
+    "life_penalty": 1           # Points deducted for each remaining life point at the end of the game
+}
+
+# --- Game State Configuration ---
+MAX_GAME_DURATION = 180
+
+# # --- Game State Configuration ---
+# GAME_STATES = {
+#     "WAITING": 0,              # Waiting for players to join
+#     "COUNTDOWN": 1,            # Countdown before the game starts
+#     "RUNNING": 2,              # Game is currently running
+#     "ENDED": 3                 # Game has ended
+# }
+# # --- Game Over Configuration ---
+# GAME_OVER_DURATION = 3.0     # Duration in seconds before the game resets after it ends
