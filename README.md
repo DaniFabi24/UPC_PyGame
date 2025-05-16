@@ -14,7 +14,7 @@ UPC_PyGame is a 2D multiplayer arena shooter simulation. This project integrates
 The objective is to be the last surviving player in the arena.
 
 * **Setup:** Players connect as agents to control their unique, colored triangular spacecraft. The arena is populated with static circular obstacles and is enclosed by reflective energy boundaries.
-* **Game Start:** Once all connected players in the pre-game lobby have indicated their readiness to compete, the game server initiates a countdown sequence, signaling the imminent start of the match.
+* **Game Start:** Once all connected players in the pre-game lobby have indicated their readiness to compete (Right Shift Key), the game server initiates a countdown sequence, signaling the imminent start of the match.
 * **Gameplay:** Players pilot their spacecraft using directional thrust for movement and rotational commands for aiming. Skillful navigation is crucial to avoid collisions with both the static obstacles scattered throughout the arena and the dynamic boundaries that enclose the play space. Strategic positioning is key to engaging opposing players effectively.
 * **Combat:** The primary form of interaction between players is through the firing of colored energy projectiles. These projectiles travel in a straight line from the firing player's spacecraft. Direct hits on an opponent's spacecraft inflict damage, gradually reducing their overall health. To ensure a fair initial engagement, a temporary period of invulnerability and shooting restriction is applied immediately after a player enters the arena (spawn protection).
 * **Elimination:** When a player's spacecraft sustains enough damage to deplete their health to zero, they are considered eliminated from the current game round. Their agent will no longer be able to control their spacecraft.
@@ -80,11 +80,12 @@ The system consists of three main components:
 
 ## Running the Simulation
 
-You have two main ways to run the simulation: all at once using the `run_game.sh` script, or step by step by manually launching the server and then the agents.
+You have two main ways to run the simulation: all at once using the `run_game.sh` script, or step by step by manually launching the server and then the agents. 
 
-### Running the Simulation at once (with `run_game.sh`)
+### Running the Simulation (with `run_game.sh`)
 
-This script provides a convenient way to start the entire simulation, including the server, visualizer, and a specified number of agents, in one go.
+This script provides a convenient way to start the entire simulation, including the server, visualizer, and all agent scripts found in the `agents/` folder.
+*Note:* You can add your own agent scripts to this folder to participate in the simulation.
 
 1.  **Ensure the script is executable:**
     ```bash
@@ -96,34 +97,33 @@ This script provides a convenient way to start the entire simulation, including 
     ```bash
     ./run_game.sh
     ```
-    After launching, the script will first print "Starting game (main.py)..." and start the FastAPI server and Pygame visualizer in the background. It will then pause for 8 seconds to allow the server sufficient time to initialize.
+    The script will:
+    - Start the FastAPI server and Pygame visualizer in the background.
+    - Wait a few seconds for the server to initialize.
+    - Automatically detect all Python files in the `agents/` directory.
+    - Start each detected agent as a separate process.
 
-3.  **Enter the number of agents:**
-    You will be prompted with the message "How many agents do you want to start? ". Enter the desired number of agents and press Enter.
-
-4.  **Agent startup:**
-    The script will then proceed to start the specified number of `dummy_agent.py` instances in the background. Each agent will connect to the running game server.
-
-5.  **Termination:**
+3.  **Termination:**
     The script will wait for the `main.py` process (server and visualizer) to finish before the `run_game.sh` script itself terminates. You can typically close the visualizer window to end the entire simulation.
 
 ### Running the Simulation step by step
 
-This method allows for more control over the startup process and is useful for debugging or when you want to start agents individually.
+If you want more control, you can also start the components manually:
 
 1.  **Start the Server and Visualizer:**
-    Open a terminal in the project root (where `main.py` is located) and run the main script:
+    Open a terminal in the project root and run:
     ```bash
     python main.py
     ```
     Wait for the console output indicating the server is running and the visualizer window to appear. The server runs in a background thread initiated by `main.py`, and the visualizer runs in the main thread.
 
 2.  **Run Agent(s):**
-    *After* the server and visualizer are running, open one or more *separate* terminal windows (ensure the virtual environment is activated in each). In each terminal, navigate to the project root and run the dummy agent script:
+    In one or more *separate* terminal windows, run any agent script from the `agents/` directory:
     ```bash
-    python dummy_agent.py
+    python agents/agent1.py
+    python agents/agent2.py
     ```
-    Each execution of this command will connect a new agent/player to the already running game server. You can run this command multiple times to add more agents.
+    Each execution will connect a new agent/player to the running game server.
 
 
 ## Agent Control (`dummy_agent.py`)
