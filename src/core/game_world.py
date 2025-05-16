@@ -358,6 +358,17 @@ class GameWorld:
         Args:
             dt (float): Delta time since the last update.
         """
+
+        if self.game_started:
+            if not hasattr(self, "start_time"):
+                self.start_time = time.time()
+            elif time.time() - self.start_time > MAX_GAME_DURATION:
+                # Timeout erreicht: Restleben bestrafen und Spiel neu starten
+                remaining = {pid: p.health for pid, p in self.players.items()}
+                self.score_sys.on_game_end(remaining)
+                self.restart_game()
+                return  # Early-exit, damit nicht mehr weiter upgedatet wird
+    
         self.space.step(dt)
         for player in self.players.values():
             player.body.angular_velocity *= 1 - 0.1 * PHYSICS_DT
@@ -444,6 +455,9 @@ class GameWorld:
         For each connected player, it removes the old instance and re-adds a new one using the existing player ID.
         """
         print("Restarting game...")
+
+        remaining = {pid: p.health for pid, p in self.players.items()}
+        self.score_sys.on_game_end(remaining)
 
         # Reset global game state variables.
         self.game_started = False
