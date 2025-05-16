@@ -723,6 +723,95 @@ class GameWorld:
                 text_rect = text_surface.get_rect(center=(self.width // 2, 30))
                 screen.blit(text_surface, text_rect)
 
+
+            # --- Dynamic fancy score box visualization for all players ---
+            if not hasattr(self, "scores"):
+                self.scores = {}
+            for pid in self.players:
+                if pid not in self.scores:
+                    self.scores[pid] = 0
+
+            score_strings = []
+            for pid, player in self.players.items():
+                color = player.color if hasattr(player, "color") else (255,255,255)
+                agent_name = getattr(player, "agent_name", pid[:6])
+                score = self.scores.get(pid, 0)
+                score_strings.append((f"{agent_name}: {score}", color))
+
+            # Layout: max 4 scores per row, then wrap
+            scores_per_row = 4
+            rows = [score_strings[i:i+scores_per_row] for i in range(0, len(score_strings), scores_per_row)]
+
+            padding_x = 30
+            padding_y = 12
+            spacing = 40
+            font_height = font.get_height()
+            row_heights = []
+            row_widths = []
+
+            # Prepare text surfaces and calculate width for each row
+            row_surfaces = []
+            for row in rows:
+                text_surfaces = []
+                total_width = -spacing
+                for score_str, color in row:
+                    surf = font.render(score_str, True, color)
+                    text_surfaces.append((surf, color))
+                    total_width += surf.get_width() + spacing
+                row_surfaces.append(text_surfaces)
+                row_widths.append(total_width)
+                row_heights.append(font_height)
+
+            box_width = max(max(row_widths) + 2 * padding_x, 250) if row_widths else 250
+            box_height = len(rows) * (font_height + padding_y) + padding_y
+            box_x = (screen.get_width() - box_width) // 2
+            box_y = screen.get_height() - box_height - 18
+
+            # Draw semi-transparent background box with rounded corners
+            box_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
+            box_surface.fill((0, 0, 0, 0))  # Fully transparent base
+
+            # Draw a glowing border (outer glow)
+            for glow in range(8, 0, -2):
+                pygame.draw.rect(
+                    box_surface,
+                    (255, 215, 0, 30),  # Gold, low alpha for glow
+                    pygame.Rect(glow, glow, box_width - 2*glow, box_height - 2*glow),
+                    border_radius=18
+                )
+
+            # Draw main box
+            pygame.draw.rect(
+                box_surface,
+                (40, 40, 60, 220),  # Slightly bluish dark, semi-transparent
+                box_surface.get_rect(),
+                border_radius=18
+            )
+
+            # Draw border
+            pygame.draw.rect(
+                box_surface,
+                (255, 215, 0),  # Gold border
+                box_surface.get_rect(),
+                width=4,
+                border_radius=18
+            )
+
+            # Blit score texts centered inside the box, row by row
+            y = padding_y
+            for text_surfaces in row_surfaces:
+                # Center this row horizontally in the box
+                row_width = sum(surf.get_width() for surf, _ in text_surfaces) + spacing * (len(text_surfaces)-1)
+                x = (box_width - row_width) // 2
+                for surf, color in text_surfaces:
+                    box_surface.blit(surf, (x, y))
+                    x += surf.get_width() + spacing
+                y += font_height + padding_y
+
+            # Blit the box onto the main screen
+            screen.blit(box_surface, (box_x, box_y))
+
+
             pygame.display.flip()
 
         pygame.quit()
