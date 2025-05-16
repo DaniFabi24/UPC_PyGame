@@ -120,7 +120,7 @@ class GameWorld:
             new_player = Triangle(safe_spawn_pos, color=player_color, game_world=self)
             new_player.player_id = player_id
             self.players[player_id] = new_player
-            self.score_sys.register_agent(player_id)
+            self.score_sys.register_agent(player_id) # Register the player in the score system
             print(f"Player added with ID: {player_id} at {safe_spawn_pos} with color {player_color}.")
             return player_id
         else:
@@ -341,6 +341,7 @@ class GameWorld:
             )
             self.increment_shot_count()
             print(f"Shot fired by {player_id}! Total shots: {self.shot_count}")
+            self.score_sys.on_shot(player_id) # Register shot in the score system
 
     def increment_shot_count(self):
         """
