@@ -6,6 +6,8 @@ import uuid
 import math
 import random
 import time
+import os
+import matplotlib.pyplot as plt
 from .game_objects import *
 from ..settings import *
 from .score_system import ScoreSystem
@@ -324,6 +326,12 @@ class GameWorld:
             if time.time() < player.spawn_protection_until:
                 print(f"Player {player_id} cannot shoot during spawn protection.")
                 return
+            
+            # --- Count shots per player ---
+            if hasattr(player, "shots_fired"):
+                player.shots_fired += 1
+            else:
+                player.shots_fired = 1
 
             player_angle_rad = player.body.angle
             offset_distance = player.radius + PROJECTILE_RADIUS + 1
@@ -459,6 +467,9 @@ class GameWorld:
 
         remaining = {pid: p.health for pid, p in self.players.items()}
         self.score_sys.on_game_end(remaining)
+
+        # Show statistics plot before resetting players/objects
+        self.plot_game_statistics()
 
         # Reset global game state variables.
         self.game_started = False
@@ -675,6 +686,86 @@ class GameWorld:
 
                 # "Last Man Standing": player.last
                 # "Vote for Restart":  player.vote_for_restart
+    
+    def plot_game_statistics(self):
+        try:
+            """
+            Plots bar charts for shots, collisions, and final scores for each player,
+            and saves the plot as a PDF and PNG file.
+            """
+            player_names = []
+            shots = []
+            collisions = []
+            scores = []
+
+            for pid, player in self.players.items():
+                name = getattr(player, "agent_name", pid[:6])
+                player_names.append(name)
+                shots.append(getattr(player, "shots_fired", 0))
+                collisions.append(getattr(player, "collisions", 0))
+                scores.append(self.score_sys.get_score(pid))
+
+            fig, axs = plt.subplots(1, 3, figsize=(16, 6))
+            bar_width = 0.7
+
+            # Farben für Spieler wie im Spiel (falls vorhanden)
+            bar_colors = []
+            for pid in self.players:
+                color = getattr(self.players[pid], "color", (100, 100, 100))
+                # Matplotlib erwartet Farben als 0-1 floats
+                bar_colors.append(tuple([c/255 for c in color]))
+
+            # Shots fired
+            bars0 = axs[0].bar(player_names, shots, color=bar_colors, width=bar_width, edgecolor='black')
+            axs[0].set_title("Shots Fired", fontsize=16, fontweight='bold')
+            axs[0].set_ylabel("Shots", fontsize=13)
+            axs[0].grid(axis='y', linestyle='--', alpha=0.5)
+            for bar in bars0:
+                height = bar.get_height()
+                axs[0].annotate(f'{int(height)}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                                xytext=(0, 5), textcoords="offset points", ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+            # Collisions
+            bars1 = axs[1].bar(player_names, collisions, color=bar_colors, width=bar_width, edgecolor='black')
+            axs[1].set_title("Collisions", fontsize=16, fontweight='bold')
+            axs[1].set_ylabel("Collisions", fontsize=13)
+            axs[1].grid(axis='y', linestyle='--', alpha=0.5)
+            for bar in bars1:
+                height = bar.get_height()
+                axs[1].annotate(f'{int(height)}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                                xytext=(0, 5), textcoords="offset points", ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+            # Final Score
+            bars2 = axs[2].bar(player_names, scores, color=bar_colors, width=bar_width, edgecolor='black')
+            axs[2].set_title("Final Score", fontsize=16, fontweight='bold')
+            axs[2].set_ylabel("Points", fontsize=13)
+            axs[2].grid(axis='y', linestyle='--', alpha=0.5)
+            for bar in bars2:
+                height = bar.get_height()
+                axs[2].annotate(f'{int(height)}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                                xytext=(0, 5), textcoords="offset points", ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+            for ax in axs:
+                ax.set_xlabel("Player", fontsize=13)
+                ax.tick_params(axis='x', labelrotation=20)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+
+            fig.suptitle("Game Statistics", fontsize=20, fontweight='bold')
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+            # --- Save as PDF and PNG ---
+            stats_dir = "game_stats"
+            os.makedirs(stats_dir, exist_ok=True)
+            pdf_path = os.path.join(stats_dir, "game_stats_latest.pdf")
+            png_path = os.path.join(stats_dir, "game_stats_latest.png")
+            plt.savefig(pdf_path)
+            plt.savefig(png_path)
+            print(f"Game statistics saved as {pdf_path} and {png_path}")
+
+            plt.close(fig)
+        except Exception as e:
+            print(f"Error while saving game statistics: {e}")
 # ------------------------------------------------------------
 
     def run_visualizer(self):
@@ -846,10 +937,62 @@ class GameWorld:
             #     score_rect = score_text.get_rect(center=(player.rect.centerx, player.rect.top - 10))
             #     screen.blit(score_text, score_rect)
 
+            # --- Game timer display with shrinking bar at the top ---
+
+            if self.game_started and hasattr(self, "start_time"):
+                elapsed = time.time() - self.start_time
+                remaining = max(0, int(MAX_GAME_DURATION - elapsed))
+                minutes = remaining // 60
+                seconds = remaining % 60
+                timer_text = f"Time left: {minutes:02d}:{seconds:02d}"
+
+                # Timer bar dimensions (thinner bar, smaller font)
+                bar_margin_x = 60
+                bar_margin_y = 10
+                bar_height = 12  # thinner bar
+                bar_width_full = self.width - 2 * bar_margin_x
+                bar_x = bar_margin_x
+                bar_y = bar_margin_y
+
+                # Calculate bar fill (shrinks as time passes)
+                percent_left = max(0, min(1.0, remaining / MAX_GAME_DURATION))
+                bar_width_current = int(bar_width_full * percent_left)
+
+                # Draw background bar (empty)
+                pygame.draw.rect(
+                    screen,
+                    (60, 60, 60, 180),  # dark gray
+                    (bar_x, bar_y, bar_width_full, bar_height),
+                    border_radius=8
+                )
+                # Draw filled bar (remaining time)
+                pygame.draw.rect(
+                    screen,
+                    (0, 200, 0),  # green
+                    (bar_x, bar_y, bar_width_current, bar_height),
+                    border_radius=8
+                )
+                # Draw border
+                pygame.draw.rect(
+                    screen,
+                    (255, 215, 0),  # gold
+                    (bar_x, bar_y, bar_width_full, bar_height),
+                    width=2,
+                    border_radius=8
+                )
+
+                # Draw timer text centered in the bar (smaller font)
+                timer_font = pygame.font.SysFont(None, 20)
+                timer_surface = timer_font.render(timer_text, True, (255, 255, 255))
+                timer_rect = timer_surface.get_rect(center=(self.width // 2, bar_y + bar_height // 2))
+                screen.blit(timer_surface, timer_rect)
+
+    
 
             pygame.display.flip()
 
         pygame.quit()
+
 
 # Create global instance after initialization:
 game_world_instance = GameWorld(SCREEN_WIDTH, SCREEN_HEIGHT)
