@@ -387,6 +387,7 @@ class GameWorld:
                     self.waiting_for_players = False
                     self.game_started = True
                     self.countdown_active = False
+                    self.start_time = time.time() # Spielstartzeit setzen
                 else:
                     print("Not all players ready after countdown (or no players left). Resetting to waiting state.")
                     self.countdown_active = False
@@ -724,6 +725,15 @@ class GameWorld:
                         health_rect = pygame.Rect(bar_x, bar_y, current_bar_width, bar_height)
                         pygame.draw.rect(screen, health_color, health_rect)
                     pygame.draw.rect(screen, border_color, background_rect, 1)
+
+            # Display scoring information
+            for player in self.players.values():
+                # score_sys ist in GameWorld angelegt
+                score = self.score_sys.get_score(player.player_id)
+                score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+                # Position: über dem Spieler-Avatar, z.B. 20 px darüber
+                score_rect = score_text.get_rect(center=(player.rect.centerx, player.rect.top - 10))
+                screen.blit(score_text, score_rect)
 
             # Text display based on game state
             display_text = ""
