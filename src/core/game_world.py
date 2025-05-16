@@ -8,6 +8,9 @@ import random
 import time
 from .game_objects import *
 from ..settings import *
+from .score_system import ScoreSystem
+from ..settings      import SCORE_CONFIG, MAX_GAME_DURATION
+
 
 # Predefined player colors used cyclically when creating new players.
 PLAYER_COLORS = [
@@ -52,6 +55,7 @@ class GameWorld:
         self.next_color_index = 0   # Index to select the next player color from PLAYER_COLORS
         self.game_started = False # Flag indicating whether the game has started
         self.waiting_for_players = True # Flag indicating whether the game is waiting for players to join
+        self.score_sys = ScoreSystem(SCORE_CONFIG)
         # NEU: Countdown-Zustandsvariablen
         self.countdown_active = False
         self.countdown_seconds_remaining = 0.0
@@ -116,6 +120,7 @@ class GameWorld:
             new_player = Triangle(safe_spawn_pos, color=player_color, game_world=self)
             new_player.player_id = player_id
             self.players[player_id] = new_player
+            self.score_sys.register_agent(player_id)
             print(f"Player added with ID: {player_id} at {safe_spawn_pos} with color {player_color}.")
             return player_id
         else:
