@@ -685,7 +685,8 @@ class GameWorld:
         clock = pygame.time.Clock()
         all_game_sprites = pygame.sprite.Group()
         running = True
-        font = pygame.font.SysFont(None, 36) # Slightly larger font
+        font = pygame.font.SysFont(None, 36) # Slightly larger font for countdown
+        score_font = pygame.font.SysFont(None, 24) # Smaller font for scores
 
         while running:
             for event in pygame.event.get():
@@ -726,15 +727,7 @@ class GameWorld:
                         pygame.draw.rect(screen, health_color, health_rect)
                     pygame.draw.rect(screen, border_color, background_rect, 1)
 
-            # # Display scoring information
-            # for player in self.players.values():
-            #     # score_sys ist in GameWorld angelegt
-            #     score = self.score_sys.get_score(player.player_id)
-            #     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
-            #     # Position: über dem Spieler-Avatar, z.B. 20 px darüber
-            #     score_rect = score_text.get_rect(center=(player.rect.centerx, player.rect.top - 10))
-            #     screen.blit(score_text, score_rect)
-
+          
             # Text display based on game state
             display_text = ""
             text_color = (255, 255, 0) # Default Yellow
@@ -754,12 +747,14 @@ class GameWorld:
                 screen.blit(text_surface, text_rect)
 
 
-            # Display scoring information
+            # --- SCORING DISPLAY ---
+            # Display scores in a semi-transparent box at the bottom
+
             score_strings = []
             for pid, player in self.players.items():
                 color = player.color if hasattr(player, "color") else (255,255,255)
                 agent_name = getattr(player, "agent_name", pid[:6])
-                score = self.score_sys.get_score(pid)  # <-- ScoreSystem verwenden!
+                score = self.score_sys.get_score(pid) 
                 score_strings.append((f"{agent_name}: {score}", color))
 
             # Layout: max 4 scores per row, then wrap
@@ -769,7 +764,7 @@ class GameWorld:
             padding_x = 30
             padding_y = 12
             spacing = 40
-            font_height = font.get_height()
+            font_height = score_font.get_height()
             row_heights = []
             row_widths = []
 
@@ -779,7 +774,7 @@ class GameWorld:
                 text_surfaces = []
                 total_width = -spacing
                 for score_str, color in row:
-                    surf = font.render(score_str, True, color)
+                    surf = score_font.render(score_str, True, color)
                     text_surfaces.append((surf, color))
                     total_width += surf.get_width() + spacing
                 row_surfaces.append(text_surfaces)
@@ -834,6 +829,16 @@ class GameWorld:
 
             # Blit the box onto the main screen
             screen.blit(box_surface, (box_x, box_y))
+
+            # # --- Scoring display above the players ---
+            # # Uncomment if you want to show scores above player avatars
+            # for player in self.players.values():
+            #     # score_sys ist in GameWorld angelegt
+            #     score = self.score_sys.get_score(player.player_id)
+            #     score_text = score_font.render(f"Score: {score}", True, (255, 255, 255))
+            #     # Position: über dem Spieler-Avatar, z.B. 20 px darüber
+            #     score_rect = score_text.get_rect(center=(player.rect.centerx, player.rect.top - 10))
+            #     screen.blit(score_text, score_rect)
 
 
             pygame.display.flip()
