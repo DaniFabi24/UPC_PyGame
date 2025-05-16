@@ -374,6 +374,7 @@ def player_hit_obstacle(arbiter, space, data):
         if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
             player_sprite.take_damage(OBSTACLE_DAMAGE)
             game_world.player_collisions += 1
+            game_world.score_sys.on_collision(player_sprite.player_id) # Register collision in score system
             print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
         else:
             print(f"Player collided with obstacle at low speed. No damage taken.")
@@ -387,6 +388,7 @@ def player_hit_obstacle(arbiter, space, data):
         if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
             player_sprite.take_damage(OBSTACLE_DAMAGE)
             game_world.player_collisions += 1
+            game_world.score_sys.on_collision(player_sprite.player_id) # Register collision in score system
             print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
         else:
             print(f"Player collided with obstacle at low speed. No damage taken.")
