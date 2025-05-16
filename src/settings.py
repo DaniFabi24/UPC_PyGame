@@ -45,7 +45,7 @@ SCORE_CONFIG = {
 }
 
 # --- Game State Configuration ---
-MAX_GAME_DURATION = 180
+MAX_GAME_DURATION = 180  # Maximum duration of the game in seconds (3 minutes)
 
 # # --- Game State Configuration ---
 # GAME_STATES = {

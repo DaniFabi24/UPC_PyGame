@@ -363,7 +363,7 @@ class GameWorld:
             if not hasattr(self, "start_time"):
                 self.start_time = time.time()
             elif time.time() - self.start_time > MAX_GAME_DURATION:
-                # Timeout erreicht: Restleben bestrafen und Spiel neu starten
+                # Maximale Spielzeit erreicht: Restleben bestrafen und Spiel neu starten
                 remaining = {pid: p.health for pid, p in self.players.items()}
                 self.score_sys.on_game_end(remaining)
                 self.restart_game()
@@ -659,12 +659,18 @@ class GameWorld:
     def game_state(self, player_id):
         player = self.players.get(player_id)
         if player:
+            # Berechne die vergangene Zeit seit Spielstart
+            if self.game_started and hasattr(self, "start_time"):
+                elapsed = time.time() - self.start_time
+            else:
+                elapsed = 0.0
             return {
                 "game_started": self.game_started,
                 "waiting_for_players": self.waiting_for_players,
                 "countdown_active": self.countdown_active,
                 "countdown_seconds_remaining": math.ceil(self.countdown_seconds_remaining) if self.countdown_active else 0,
-                "ready": player.ready
+                "ready": player.ready,
+                "elapsed_game_time": round(elapsed, 1) 
             }
 
                 # "Last Man Standing": player.last
