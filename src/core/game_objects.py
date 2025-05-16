@@ -374,6 +374,7 @@ def player_hit_obstacle(arbiter, space, data):
         if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
             player_sprite.take_damage(OBSTACLE_DAMAGE)
             game_world.player_collisions += 1
+            game_world.score_sys.on_collision(player_sprite.player_id) # Register collision in score system
             print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
         else:
             print(f"Player collided with obstacle at low speed. No damage taken.")
@@ -387,6 +388,7 @@ def player_hit_obstacle(arbiter, space, data):
         if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
             player_sprite.take_damage(OBSTACLE_DAMAGE)
             game_world.player_collisions += 1
+            game_world.score_sys.on_collision(player_sprite.player_id) # Register collision in score system
             print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
         else:
             print(f"Player collided with obstacle at low speed. No damage taken.")
@@ -429,6 +431,14 @@ def projectile_hit_player(arbiter, space, data):
 
     print(f"Player hit by projectile! Applying {PROJECTILE_DAMAGE} damage.")
     player.take_damage(PROJECTILE_DAMAGE)
+    # Points for hitting a player
+    if game_world and projectile.owner and hasattr(projectile.owner, "player_id"):
+        shooter_id = projectile.owner.player_id
+        game_world.score_sys.on_hit(shooter_id)
+    # Points for killing a player
+    if player.health <= 0 and game_world and projectile.owner and hasattr(projectile.owner, "player_id"):
+        killer_id = projectile.owner.player_id
+        game_world.score_sys.on_kill(killer_id)
     projectile.remove_from_world()
     return True
 

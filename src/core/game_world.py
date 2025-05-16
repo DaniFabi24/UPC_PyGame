@@ -8,6 +8,9 @@ import random
 import time
 from .game_objects import *
 from ..settings import *
+from .score_system import ScoreSystem
+from ..settings      import SCORE_CONFIG, MAX_GAME_DURATION
+
 
 # Predefined player colors used cyclically when creating new players.
 PLAYER_COLORS = [
@@ -52,6 +55,7 @@ class GameWorld:
         self.next_color_index = 0   # Index to select the next player color from PLAYER_COLORS
         self.game_started = False # Flag indicating whether the game has started
         self.waiting_for_players = True # Flag indicating whether the game is waiting for players to join
+        self.score_sys = ScoreSystem(SCORE_CONFIG) # Initialize the score system with the provided configuration from settings.py
         # NEU: Countdown-Zustandsvariablen
         self.countdown_active = False
         self.countdown_seconds_remaining = 0.0
@@ -116,6 +120,7 @@ class GameWorld:
             new_player = Triangle(safe_spawn_pos, color=player_color, game_world=self)
             new_player.player_id = player_id
             self.players[player_id] = new_player
+            self.score_sys.register_agent(player_id) # Register the player in the score system
             print(f"Player added with ID: {player_id} at {safe_spawn_pos} with color {player_color}.")
             return player_id
         else:
@@ -336,6 +341,7 @@ class GameWorld:
             )
             self.increment_shot_count()
             print(f"Shot fired by {player_id}! Total shots: {self.shot_count}")
+            self.score_sys.on_shot(player_id) # Register shot in the score system
 
     def increment_shot_count(self):
         """
@@ -352,6 +358,17 @@ class GameWorld:
         Args:
             dt (float): Delta time since the last update.
         """
+
+        if self.game_started:
+            if not hasattr(self, "start_time"):
+                self.start_time = time.time()
+            elif time.time() - self.start_time > MAX_GAME_DURATION:
+                # Timeout erreicht: Restleben bestrafen und Spiel neu starten
+                remaining = {pid: p.health for pid, p in self.players.items()}
+                self.score_sys.on_game_end(remaining)
+                self.restart_game()
+                return  # Early-exit, damit nicht mehr weiter upgedatet wird
+    
         self.space.step(dt)
         for player in self.players.values():
             player.body.angular_velocity *= 1 - 0.1 * PHYSICS_DT
@@ -370,6 +387,7 @@ class GameWorld:
                     self.waiting_for_players = False
                     self.game_started = True
                     self.countdown_active = False
+                    self.start_time = time.time() # Spielstartzeit setzen
                 else:
                     print("Not all players ready after countdown (or no players left). Resetting to waiting state.")
                     self.countdown_active = False
@@ -438,6 +456,9 @@ class GameWorld:
         For each connected player, it removes the old instance and re-adds a new one using the existing player ID.
         """
         print("Restarting game...")
+
+        remaining = {pid: p.health for pid, p in self.players.items()}
+        self.score_sys.on_game_end(remaining)
 
         # Reset global game state variables.
         self.game_started = False
@@ -664,7 +685,8 @@ class GameWorld:
         clock = pygame.time.Clock()
         all_game_sprites = pygame.sprite.Group()
         running = True
-        font = pygame.font.SysFont(None, 36) # Slightly larger font
+        font = pygame.font.SysFont(None, 36) # Slightly larger font for countdown
+        score_font = pygame.font.SysFont(None, 24) # Smaller font for scores
 
         while running:
             for event in pygame.event.get():
@@ -705,6 +727,7 @@ class GameWorld:
                         pygame.draw.rect(screen, health_color, health_rect)
                     pygame.draw.rect(screen, border_color, background_rect, 1)
 
+          
             # Text display based on game state
             display_text = ""
             text_color = (255, 255, 0) # Default Yellow
@@ -724,18 +747,14 @@ class GameWorld:
                 screen.blit(text_surface, text_rect)
 
 
-            # --- Dynamic fancy score box visualization for all players ---
-            if not hasattr(self, "scores"):
-                self.scores = {}
-            for pid in self.players:
-                if pid not in self.scores:
-                    self.scores[pid] = 0
+            # --- SCORING DISPLAY ---
+            # Display scores in a semi-transparent box at the bottom
 
             score_strings = []
             for pid, player in self.players.items():
                 color = player.color if hasattr(player, "color") else (255,255,255)
                 agent_name = getattr(player, "agent_name", pid[:6])
-                score = self.scores.get(pid, 0)
+                score = self.score_sys.get_score(pid) 
                 score_strings.append((f"{agent_name}: {score}", color))
 
             # Layout: max 4 scores per row, then wrap
@@ -745,7 +764,7 @@ class GameWorld:
             padding_x = 30
             padding_y = 12
             spacing = 40
-            font_height = font.get_height()
+            font_height = score_font.get_height()
             row_heights = []
             row_widths = []
 
@@ -755,7 +774,7 @@ class GameWorld:
                 text_surfaces = []
                 total_width = -spacing
                 for score_str, color in row:
-                    surf = font.render(score_str, True, color)
+                    surf = score_font.render(score_str, True, color)
                     text_surfaces.append((surf, color))
                     total_width += surf.get_width() + spacing
                 row_surfaces.append(text_surfaces)
@@ -810,6 +829,16 @@ class GameWorld:
 
             # Blit the box onto the main screen
             screen.blit(box_surface, (box_x, box_y))
+
+            # # --- Scoring display above the players ---
+            # # Uncomment if you want to show scores above player avatars
+            # for player in self.players.values():
+            #     # score_sys ist in GameWorld angelegt
+            #     score = self.score_sys.get_score(player.player_id)
+            #     score_text = score_font.render(f"Score: {score}", True, (255, 255, 255))
+            #     # Position: über dem Spieler-Avatar, z.B. 20 px darüber
+            #     score_rect = score_text.get_rect(center=(player.rect.centerx, player.rect.top - 10))
+            #     screen.blit(score_text, score_rect)
 
 
             pygame.display.flip()
