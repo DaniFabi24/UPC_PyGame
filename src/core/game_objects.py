@@ -31,6 +31,7 @@ class Triangle(pygame.sprite.Sprite):
         # Spawn protection prevents damage immediately after spawn.
         self.spawn_protection_duration = 3.0  # Seconds of protection
         self.spawn_protection_until = -1
+        self.collisions = 0
 
         mass = 1
         moment = pymunk.moment_for_poly(mass, [
@@ -369,6 +370,7 @@ def player_hit_obstacle(arbiter, space, data):
 
     if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
         player_sprite = player_shape.sprite_ref
+        player_sprite.collisions += 1
         # Check the player's velocity
         velocity = player_sprite.body.velocity.length
         if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
@@ -383,6 +385,7 @@ def player_hit_obstacle(arbiter, space, data):
         player_shape, obstacle_shape = obstacle_shape, player_shape
         if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
             player_sprite = player_shape.sprite_ref
+            player_sprite.collisions += 1
         # Check the player's velocity
         velocity = player_sprite.body.velocity.length
         if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
@@ -479,6 +482,15 @@ def projectile_hit_border(arbiter, space, data):
         projectile_shape.sprite_ref.remove_from_world()
     return True
 
+def on_player_collision(arbiter, space, data):
+    shapes = arbiter.shapes
+    player1 = getattr(shapes[0], "sprite_ref", None)
+    player2 = getattr(shapes[1], "sprite_ref", None)
+    for player in (player1, player2):
+        if player is not None:
+            player.collisions += 1
+    return True
+
 def setup_collision_handlers(space, game_world):
     """
     Sets up collision handlers for the physics space.
@@ -512,3 +524,6 @@ def setup_collision_handlers(space, game_world):
     handler_projectile_player = space.add_collision_handler(4, 1)
     handler_projectile_player.begin = projectile_hit_player
     handler_projectile_player.data["game_world"] = game_world
+
+    handler = space.add_collision_handler(1, 1)  # Beispiel: Spieler vs Spieler
+    handler.begin = on_player_collision

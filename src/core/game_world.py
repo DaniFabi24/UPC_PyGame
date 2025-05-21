@@ -7,6 +7,7 @@ import math
 import random
 import time
 import os
+import csv
 import matplotlib.pyplot as plt
 from .game_objects import *
 from ..settings import *
@@ -766,6 +767,43 @@ class GameWorld:
             plt.close(fig)
         except Exception as e:
             print(f"Error while saving game statistics: {e}")
+
+        # --- Save last 10 games to CSV ---
+        stats_dir = "game_stats"
+        os.makedirs(stats_dir, exist_ok=True)
+        csv_path = os.path.join(stats_dir, "game_stats_last10.csv")
+
+        # 1. Lade bestehende Daten (falls vorhanden)
+        history = []
+        if os.path.exists(csv_path):
+            with open(csv_path, "r", newline="") as csvfile:
+                reader = csv.reader(csvfile)
+                header = next(reader, None)
+                for row in reader:
+                    history.append(row)
+
+        # 2. Füge aktuelle Runde(n) hinzu
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        for name, shot, collision, score in zip(player_names, shots, collisions, scores):
+            history.append([timestamp, name, shot, collision, score])
+
+        # 3. Nur die letzten 10 Spiele behalten (je Spiel = alle Spieler einer Runde)
+        if len(history) > 0:
+            # Finde die letzten 10 Zeitstempel
+            unique_timestamps = []
+            for row in history:
+                if row[0] not in unique_timestamps:
+                    unique_timestamps.append(row[0])
+            last_10_timestamps = unique_timestamps[-10:]
+            # Filtere alle Zeilen, die zu den letzten 10 Spielen gehören
+            history = [row for row in history if row[0] in last_10_timestamps]
+
+        # 4. Schreibe die CSV neu
+        with open(csv_path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["timestamp", "player", "shots", "collisions", "score"])
+            for row in history:
+                writer.writerow(row)
 # ------------------------------------------------------------
 
     def run_visualizer(self):
