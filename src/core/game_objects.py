@@ -32,6 +32,7 @@ class Triangle(pygame.sprite.Sprite):
         self.spawn_protection_duration = 3.0  # Seconds of protection
         self.spawn_protection_until = -1
         self.collisions = 0
+        self.lifetime = time.time()
 
         mass = 1
         moment = pymunk.moment_for_poly(mass, [
@@ -139,7 +140,8 @@ class Triangle(pygame.sprite.Sprite):
         self.health -= amount
         print(f"Player {self.player_id} took {amount} damage. Current health: {self.health}")
         if self.health <= 0:
-            print(f"Player {self.player_id} destroyed!")
+            self.lifetime = time.time() - self.lifetime
+            print(f"Player {self.player_id} destroyed after {self.lifetime:.2f} seconds.")
             if self.game_world:
                 if self.body in self.game_world.space.bodies:
                     self.game_world.space.remove(self.body)

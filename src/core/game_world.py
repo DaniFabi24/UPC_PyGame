@@ -396,7 +396,9 @@ class GameWorld:
                     self.waiting_for_players = False
                     self.game_started = True
                     self.countdown_active = False
-                    self.start_time = time.time() # Spielstartzeit setzen
+                    self.start_time = time.time()
+                    for player in self.players.values():
+                        player.lifetime = self.start_time
                 else:
                     print("Not all players ready after countdown (or no players left). Resetting to waiting state.")
                     self.countdown_active = False
@@ -698,6 +700,7 @@ class GameWorld:
             shots = []
             collisions = []
             scores = []
+            lifetimes = []
 
             for pid, player in self.players.items():
                 name = getattr(player, "agent_name", pid[:6])
@@ -705,6 +708,16 @@ class GameWorld:
                 shots.append(getattr(player, "shots_fired", 0))
                 collisions.append(getattr(player, "collisions", 0))
                 scores.append(self.score_sys.get_score(pid))
+                lifetime = getattr(player, "lifetime", 0)
+                if isinstance(lifetime, (int, float)):
+                    if lifetime > MAX_GAME_DURATION:
+                        lifetime = time.time() - lifetime
+                        lifetime = round(lifetime, 1)
+                        lifetimes.append(lifetime)
+                    else:
+                        lifetimes.append(round(lifetime, 1))
+                else:
+                    lifetimes.append(0)
 
             fig, axs = plt.subplots(1, 3, figsize=(16, 6))
             bar_width = 0.7
@@ -756,15 +769,16 @@ class GameWorld:
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
             # --- Save as PDF and PNG ---
-            stats_dir = "game_stats"
-            os.makedirs(stats_dir, exist_ok=True)
-            pdf_path = os.path.join(stats_dir, "game_stats_latest.pdf")
-            png_path = os.path.join(stats_dir, "game_stats_latest.png")
-            plt.savefig(pdf_path)
-            plt.savefig(png_path)
-            print(f"Game statistics saved as {pdf_path} and {png_path}")
+            if PLOT_OUTPUT: 
+                stats_dir = "game_stats"
+                os.makedirs(stats_dir, exist_ok=True)
+                pdf_path = os.path.join(stats_dir, "game_stats_latest.pdf")
+                png_path = os.path.join(stats_dir, "game_stats_latest.png")
+                plt.savefig(pdf_path)
+                plt.savefig(png_path)
+                print(f"Game statistics saved as {pdf_path} and {png_path}")
 
-            plt.close(fig)
+                plt.close(fig)
         except Exception as e:
             print(f"Error while saving game statistics: {e}")
 
@@ -784,8 +798,8 @@ class GameWorld:
 
         # 2. Füge aktuelle Runde(n) hinzu
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        for name, shot, collision, score in zip(player_names, shots, collisions, scores):
-            history.append([timestamp, name, shot, collision, score])
+        for name, shot, collision, score, lifetime in zip(player_names, shots, collisions, scores, lifetimes):
+            history.append([timestamp, name, shot, collision, score, lifetime])
 
         # 3. Nur die letzten 10 Spiele behalten (je Spiel = alle Spieler einer Runde)
         if len(history) > 0:
@@ -801,7 +815,7 @@ class GameWorld:
         # 4. Schreibe die CSV neu
         with open(csv_path, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["timestamp", "player", "shots", "collisions", "score"])
+            writer.writerow(["timestamp", "player", "shots", "collisions", "score", "lifetime"])
             for row in history:
                 writer.writerow(row)
 # ------------------------------------------------------------

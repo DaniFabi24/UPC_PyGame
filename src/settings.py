@@ -33,7 +33,7 @@ ALLOW_FRIENDLY_FIRE = False     # If True, projectiles can damage the player who
 OBSTACLE_DAMAGE = 1             # Amount of health points deducted when a player collides with an obstacle (currently disabled in collision handler)
 
 # --- Countdown Configuration ---
-COUNTDOWN_DURATION = 3.0  # Dauer des Countdowns in Sekunden, bevor das Spiel startet
+COUNTDOWN_DURATION = 1.0  # Dauer des Countdowns in Sekunden, bevor das Spiel startet
 
 # --- Score System Configuration ---
 SCORE_CONFIG = {
@@ -45,7 +45,8 @@ SCORE_CONFIG = {
 }
 
 # --- Game State Configuration ---
-MAX_GAME_DURATION = 30  # Maximum duration of the game in seconds (3 minutes)
+MAX_GAME_DURATION = 10  # Maximum duration of the game in seconds
+PLOT_OUTPUT = True
 
 # # --- Game State Configuration ---
 # GAME_STATES = {

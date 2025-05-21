@@ -15,12 +15,12 @@ import sys  # Used for exit() on critical errors.
 import json  # Used for pretty-printing JSON responses.
 from src.settings import API_URL  # API base URL for communicating with the server.
 
-
 class Agent:
     """
     Represents a dummy game agent that connects to the game server,
     sends control actions, and prints the relative game state.
     """
+
 
     def __init__(self):
         """
@@ -61,6 +61,7 @@ class Agent:
                 response = requests.post(f"{API_URL}/disconnect/{self.player_id}")
                 response.raise_for_status()
                 print("Disconnected successfully.")
+                sys.exit(1)
             except requests.exceptions.RequestException as e:
                 print(f"Error disconnecting from server: {e}")
 
