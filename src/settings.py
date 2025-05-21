@@ -45,8 +45,8 @@ SCORE_CONFIG = {
 }
 
 # --- Game State Configuration ---
-MAX_GAME_DURATION = 10  # Maximum duration of the game in seconds
-PLOT_OUTPUT = True
+MAX_GAME_DURATION = 30  # Maximum duration of the game in seconds
+PLOT_OUTPUT = False
 
 # # --- Game State Configuration ---
 # GAME_STATES = {
