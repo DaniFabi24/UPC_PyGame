@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import time
 from src.core.game_world import game_world_instance
+from fastapi import Request
 from ..settings import PHYSICS_DT
 
 app = FastAPI()
@@ -165,14 +166,15 @@ async def ready_to_play(player_id: str):
     return {"message": f"Player {player_id} is ready to play"}
 
 @app.post("/connect")
-async def connect_player():
+async def connect_player(request: Request):
     """
     Connects a new player to the game.
-
     Returns:
         The new player's ID.
     """
-    player_id = game_world_instance.add_player()
+    data = await request.json()
+    agent_name = data.get("agent_name") if isinstance(data, dict) else None
+    player_id = game_world_instance.add_player(agent_name=agent_name)  # <-- agent_name übergeben!
     return {"player_id": player_id}
 
 @app.post("/disconnect/{player_id}")

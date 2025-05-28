@@ -370,34 +370,20 @@ def player_hit_obstacle(arbiter, space, data):
     player_shape, obstacle_shape = arbiter.shapes
     game_world = data.get("game_world", None)
 
-    if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
-        player_sprite = player_shape.sprite_ref
-        player_sprite.collisions += 1
-        # Check the player's velocity
-        velocity = player_sprite.body.velocity.length
-        if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
-            player_sprite.take_damage(OBSTACLE_DAMAGE)
-            game_world.player_collisions += 1
-            game_world.score_sys.on_collision(player_sprite.player_id) # Register collision in score system
-            print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
-        else:
-            print(f"Player collided with obstacle at low speed. No damage taken.")
-    else:
-        # If shapes are reversed, swap and try again.
-        player_shape, obstacle_shape = obstacle_shape, player_shape
-        if game_world and hasattr(player_shape, 'sprite_ref') and isinstance(player_shape.sprite_ref, Triangle):
-            player_sprite = player_shape.sprite_ref
-            player_sprite.collisions += 1
-        # Check the player's velocity
-        velocity = player_sprite.body.velocity.length
-        if velocity >= PLAYER_MAX_SPEED * 0.9:  # Replace MIN_DAMAGE_VELOCITY with the threshold value
-            player_sprite.take_damage(OBSTACLE_DAMAGE)
-            game_world.player_collisions += 1
-            game_world.score_sys.on_collision(player_sprite.player_id) # Register collision in score system
-            print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
-        else:
-            print(f"Player collided with obstacle at low speed. No damage taken.")
-
+    # Versuche beide Reihenfolgen (Spieler kann shape[0] oder shape[1] sein)
+    for shape in [player_shape, obstacle_shape]:
+        if game_world and hasattr(shape, 'sprite_ref') and isinstance(shape.sprite_ref, Triangle):
+            player_sprite = shape.sprite_ref
+            velocity = player_sprite.body.velocity.length
+            if velocity >= PLAYER_MAX_SPEED * 0.9:  # Nur wenn Schaden entsteht!
+                player_sprite.collisions += 1
+                player_sprite.take_damage(OBSTACLE_DAMAGE)
+                game_world.player_collisions += 1
+                game_world.score_sys.on_collision(player_sprite.player_id)
+                print(f"Player collided with obstacle at high speed. Health: {player_sprite.health}")
+            else:
+                print(f"Player collided with obstacle at low speed. No damage taken.")
+            break  # Nur einmal pro Kollision zählen
     return True
 
 def projectile_hit_player(arbiter, space, data):

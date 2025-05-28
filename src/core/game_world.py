@@ -67,7 +67,7 @@ class GameWorld:
         self.initialize_world_objects() # *** HINDERNISSE SOFORT INITIALISIEREN ***
         self.initialize_collision_handlers() # Kollisionshandler auch früh initialisieren
 
-    def add_player(self, given_player_id=None):
+    def add_player(self, given_player_id=None, agent_name=None):
         """
         Creates and adds a new player to the game.
         
@@ -122,13 +122,17 @@ class GameWorld:
             self.next_color_index += 1
             new_player = Triangle(safe_spawn_pos, color=player_color, game_world=self)
             new_player.player_id = player_id
+            if agent_name:
+                new_player.agent_name = agent_name  # <-- Name setzen!
             self.players[player_id] = new_player
-            self.score_sys.register_agent(player_id) # Register the player in the score system
-            print(f"Player added with ID: {player_id} at {safe_spawn_pos} with color {player_color}.")
+            self.score_sys.register_agent(player_id)
+            print(f"Player added with ID: {player_id} (Name: {getattr(new_player, 'agent_name', player_id[:6])}) at {safe_spawn_pos} with color {player_color}.")
             return player_id
         else:
             print(f"Error: No safe spawn position found after {max_attempts} attempts.")
             return None
+        
+        
 
     def remove_player(self, player_id):
         """
@@ -473,6 +477,7 @@ class GameWorld:
 
         # Show statistics plot before resetting players/objects
         self.plot_game_statistics()
+        plot_csv_statistics()
 
         # Reset global game state variables.
         self.game_started = False
@@ -780,7 +785,7 @@ class GameWorld:
 
                 plt.close(fig)
         except Exception as e:
-            print(f"Error while saving game statistics: {e}")
+                print(f"Error while saving game statistics: {e}")
 
         # --- Save last 10 games to CSV ---
         stats_dir = "game_stats"
