@@ -1,26 +1,27 @@
 """
 Dummy Agent for UPC_PyGame
 
-This agent connects to the game server, sends actions based on key presses,
-and retrieves the game state relative to the agent's player perspective.
+This agent connects to the game server, sends control actions based on key presses,
+and retrieves game state information relative to the agent's player.
 
 Dependencies:
-- pygame: For handling graphics and key input.
-- requests: For making HTTP requests to the game API.
+- pygame: Used for creating a graphical window and handling key events.
+- requests: Used for making HTTP requests to the game API.
+- sys: Used to exit the program on critical errors.
+- json: Used for pretty-printing JSON responses.
 """
 
-import pygame  # Used for creating a window, handling display and key events.
-import requests  # Used for making HTTP requests to the game server.
-import sys  # Used for exit() on critical errors.
-import json  # Used for pretty-printing JSON responses.
-from src.settings import API_URL  # API base URL for communicating with the server.
+import pygame
+import requests
+import sys
+import json
+from src.settings import API_URL
 
 class Agent:
     """
     Represents a dummy game agent that connects to the game server,
-    sends control actions, and prints the relative game state.
+    sends control actions, and prints out state updates.
     """
-
 
     def __init__(self):
         """
@@ -31,33 +32,34 @@ class Agent:
 
     def connect(self):
         """
-        Connects to the game server by calling the '/connect' endpoint.
-        On success, stores the player's ID.
-        Terminates the program if unsuccessful.
+        Connects to the game server via the '/connect' endpoint.
+        
+        On success, stores the assigned player ID.
+        Terminates the program if the connection fails.
         """
         try:
             response = requests.post(f"{API_URL}/connect")
-            response.raise_for_status()  # Raises an exception for HTTP errors.
+            response.raise_for_status()  # Will raise an exception for HTTP errors.
             data = response.json()
             self.player_id = data.get("player_id")
             if self.player_id:
                 print(f"Connected successfully. Player ID: {self.player_id}")
             else:
-                print("Error: Could not get Player ID from server.")
-                sys.exit(1)  # Exit if no player ID is returned.
+                print("Error: Could not retrieve Player ID from server.")
+                sys.exit(1)
         except requests.exceptions.RequestException as e:
             print(f"Error connecting to server: {e}")
             sys.exit(1)
 
     def disconnect(self):
         """
-        Disconnects the player from the game server by calling the '/disconnect/{player_id}' endpoint.
-        Prints a success or error message based on the result.
+        Disconnects the player from the game server via the '/disconnect/{player_id}' endpoint.
+        
+        Prints a success or error message and terminates the program upon disconnection.
         """
         if self.player_id:
             try:
                 print(f"Disconnecting player {self.player_id}...")
-                # Correct endpoint for disconnecting.
                 response = requests.post(f"{API_URL}/disconnect/{self.player_id}")
                 response.raise_for_status()
                 print("Disconnected successfully.")
@@ -69,10 +71,8 @@ class Agent:
         """
         Sends an action command to the server for the current player.
 
-        The action_path should match one of the API endpoints (e.g. "shoot", "thrust_forward").
-
         Args:
-            action_path (str): The action to perform.
+            action_path (str): The action to perform (e.g. "shoot", "thrust_forward").
         """
         if not self.player_id:
             print("Error: No Player ID. Cannot send action.")
@@ -80,8 +80,6 @@ class Agent:
         try:
             url = f"{API_URL}/player/{self.player_id}/{action_path}"
             response = requests.post(url)
-
-            # Handle 404 errors (player not found)
             if response.status_code == 404:
                 print(
                     f"Error: Player ID '{self.player_id}' not found on server. "
@@ -89,8 +87,7 @@ class Agent:
                 )
                 self.player_id = None  # Reset the player ID.
                 return
-            response.raise_for_status()  # Will raise an exception for other HTTP error codes.
-            # Optional quiet output: print(f"Action '{action_path}' sent.")
+            response.raise_for_status()
         except requests.exceptions.RequestException as e:
             print(f"Error sending action '{action_path}': {e}")
 
@@ -98,21 +95,22 @@ class Agent:
         """
         Retrieves the current game state relative to the agent's player.
 
-        Calls the '/player/{player_id}/state' endpoint using a GET request to obtain the state.
+        Calls the '/player/{player_id}/scan' endpoint to obtain relative state information.
         Pretty prints the JSON response.
 
         Returns:
-            dict or None: The game state if successful; otherwise, None.
+            dict or None: The current state data if successful, otherwise None.
         """
         if not self.player_id:
             print("Error: No Player ID. Cannot get state.")
             return None
         try:
-            url = f"{API_URL}/player/{self.player_id}/scan"  # Correct endpoint for relative state.
+            url = f"{API_URL}/player/{self.player_id}/scan"
+            response = requests.get(url)
+            response.raise_for_status()
             state_data = response.json()
             print("-" * 20)
             print("Current Relative State:")
-            # Pretty print the JSON state data.
             print(json.dumps(state_data, indent=2))
             print("-" * 20)
             return state_data
@@ -127,8 +125,17 @@ class Agent:
         """
         Runs the agent's main loop.
 
-        Initializes a small pygame window. Uses key events to send control actions to the server.
-        SPACE sends a shoot action, arrow keys control movement and rotation, and ENTER polls for state.
+        Initializes a small pygame window and processes key events to send control
+        actions to the server. Key bindings:
+          - SPACE: Send 'shoot' action.
+          - ARROW KEYS: Control movement and rotation.
+          - ENTER: Poll game state via '/scan'.
+          - RIGHT SHIFT: Signal that the player is ready.
+          - LEFT SHIFT: Retrieve overall game state.
+          - LEFT CTRL: Retrieve player-specific state.
+          - ESCAPE: Restart the game.
+          - Number 1: Disconnect from the game.
+        
         The loop continues until the window is closed or the player ID is lost.
         """
         pygame.init()
@@ -137,7 +144,7 @@ class Agent:
         clock = pygame.time.Clock()
 
         running = True
-        while running and self.player_id:  # Loop ends if the window is closed or player_id becomes None.
+        while running and self.player_id:
             screen.fill((255, 255, 255))
             pygame.display.flip()
 
@@ -145,43 +152,58 @@ class Agent:
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
-                    # SPACE sends the 'shoot' action.
                     if event.key == pygame.K_SPACE:
                         self.send_action("shoot")
-                    # ENTER key polls for the current game state.
                     elif event.key == pygame.K_RETURN:
-                        response = requests.get(f"{API_URL}/player/{self.player_id}/scan")
-                        print(f"Game-State: {response.json()}")
+                        try:
+                            response = requests.get(f"{API_URL}/player/{self.player_id}/scan")
+                            response.raise_for_status()
+                            print(f"Game State: {response.json()}")
+                        except requests.exceptions.RequestException as e:
+                            print(f"Error polling game state: {e}")
                     elif event.key == pygame.K_RSHIFT:
-                        response = requests.post(f"{API_URL}/player/ready/{self.player_id}")
-                        print(f"Player {self.player_id} is ready to play.")
+                        try:
+                            response = requests.post(f"{API_URL}/player/ready/{self.player_id}")
+                            response.raise_for_status()
+                            print(f"Player {self.player_id} is ready to play.")
+                        except requests.exceptions.RequestException as e:
+                            print(f"Error setting player ready: {e}")
                     elif event.key == pygame.K_LSHIFT:
-                        response = requests.get(f"{API_URL}/player/{self.player_id}/game-state")
-                        print(f"Game-State: {response.json()}")
+                        try:
+                            response = requests.get(f"{API_URL}/player/{self.player_id}/game-state")
+                            response.raise_for_status()
+                            print(f"Game State: {response.json()}")
+                        except requests.exceptions.RequestException as e:
+                            print(f"Error retrieving game state: {e}")
                     elif event.key == pygame.K_LCTRL:
-                        response = requests.get(f"{API_URL}/player/{self.player_id}/state")
-                        print(f"Player-State: {response.json()}")
+                        try:
+                            response = requests.get(f"{API_URL}/player/{self.player_id}/state")
+                            response.raise_for_status()
+                            print(f"Player State: {response.json()}")
+                        except requests.exceptions.RequestException as e:
+                            print(f"Error retrieving player state: {e}")
                     elif event.key == pygame.K_ESCAPE:
-                        response = requests.post(f"{API_URL}/game/restart")
+                        try:
+                            response = requests.post(f"{API_URL}/game/restart")
+                            response.raise_for_status()
+                        except requests.exceptions.RequestException as e:
+                            print(f"Error sending restart command: {e}")
                     elif event.key == pygame.K_1:
-                        response = requests.post(f"{API_URL}/disconnect/{self.player_id}")
+                        self.send_action("disconnect")
 
-            # Continuous action sending based on key hold status.
+            keys = pygame.key.get_pressed()
             if self.player_id:
-                keys = pygame.key.get_pressed()
                 if keys[pygame.K_UP]:
                     self.send_action("thrust_forward")
                 elif keys[pygame.K_DOWN]:
                     self.send_action("thrust_backward")
-
                 if keys[pygame.K_LEFT]:
                     self.send_action("rotate_left")
                 elif keys[pygame.K_RIGHT]:
                     self.send_action("rotate_right")
 
-            clock.tick(30)  # Limits the loop to 30 frames per second.
+            clock.tick(30)
 
-        # When finished, disconnect from the server and quit pygame.
         self.disconnect()
         pygame.quit()
 

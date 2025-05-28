@@ -1,78 +1,77 @@
+**Deadline Notice:** The first submission for agents must occur by June 1st. No changes will be accepted after June 19th. For further details, please refer to the Discussion Tab.
+
 # UPC_PyGame Simulation
 
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
-[![Framework](https://img.shields.io/badge/Framework-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
-[![Physics](https://img.shields.io/badge/Physics-Pymunk-orange.svg)](http://www.pymunk.org/)
-[![Graphics](https://img.shields.io/badge/Graphics-Pygame-red.svg)](https://www.pygame.org/)
+## Updates
+- **Agent Mapping:** When players connect, the system now records the originating agent/program name along with the player UUID. This ensures that even when a player reconnects (receiving a new UUID), their statistics can be traced back to their originating agent.
+- **Improved Statistics:** The survival lifetime of players is now precisely tracked and written to CSV and plot outputs for detailed post-game analysis.
+- **Enhanced Game Restart:** The game restart functionality has been improved. When restarted, existing connections are maintained (with the same UUIDs) and players are reset for a fresh match.
+- **Optimized API Endpoints:** Several API endpoints have been refined for smoother agent interactions and reliable state updates.
 
 ## Overview
 
-UPC_PyGame is a 2D multiplayer arena shooter simulation. This project integrates a robust FastAPI server to manage the game state and employs the Pymunk physics engine for realistic interactions within the game world. Players are represented by autonomous agents that connect to the server via a straightforward HTTP API, allowing them to control their unique spacecraft. A Pygame-based visualizer provides a real-time graphical representation of the arena, displaying the dynamic interactions between players, obstacles, and projectiles.
+UPC_PyGame is a 2D multiplayer arena shooter simulation that combines a robust FastAPI server with a realistic Pymunk physics engine. Players are represented by autonomous agents that connect via a simple HTTP API to control their uniquely colored spacecraft in a dynamic arena. A Pygame-based visualizer gives you real-time, eye-catching graphics of the action as players battle, dodge obstacles, and fire projectiles.
 
 ## Game Rules
 
 The objective is to be the last surviving player in the arena.
 
-* **Setup:** Players connect as agents to control their unique, colored triangular spacecraft. The arena is populated with static circular obstacles and is enclosed by reflective energy boundaries.
-* **Game Start:** Once all connected players in the pre-game lobby have indicated their readiness to compete (Right Shift Key), the game server initiates a countdown sequence, signaling the imminent start of the match.
-* **Gameplay:** Players pilot their spacecraft using directional thrust for movement and rotational commands for aiming. Skillful navigation is crucial to avoid collisions with both the static obstacles scattered throughout the arena and the dynamic boundaries that enclose the play space. Strategic positioning is key to engaging opposing players effectively.
-* **Combat:** The primary form of interaction between players is through the firing of colored energy projectiles. These projectiles travel in a straight line from the firing player's spacecraft. Direct hits on an opponent's spacecraft inflict damage, gradually reducing their overall health. To ensure a fair initial engagement, a temporary period of invulnerability and shooting restriction is applied immediately after a player enters the arena (spawn protection).
-* **Elimination:** When a player's spacecraft sustains enough damage to deplete their health to zero, they are considered eliminated from the current game round. Their agent will no longer be able to control their spacecraft.
-* **Winning:** The victor of a game round is the final player whose spacecraft remains operational (i.e., with health greater than zero) after all other players have been eliminated.
+- **Setup:** Connect as an agent to control your uniquely colored triangular spacecraft. The arena is filled with static circular obstacles and enclosed by energetic reflective boundaries.
+- **Game Start:** Once all players in the pre-game lobby signal they are ready (using the Right Shift key), a countdown begins. When the countdown expires, the match commences.
+- **Gameplay:** Navigate your spacecraft using directional thrust and rotational commands. Avoid collisions with obstacles and boundaries while engaging opponents. Skillful maneuvering and precise shooting are key to victory.
+- **Combat:** Engage opponents by firing colored energy projectiles. Direct hits reduce an opponent’s health. Beware of spawn protection: newly spawned players have temporary invulnerability and shooting restrictions.
+- **Elimination:** A player is eliminated when their health reaches zero. Their survival time (lifetime) is recorded for post-match statistics.
+- **Winning:** The last player standing (with health above zero) wins the match.
 
 ## Features
 
-* **Multiplayer Support:** Facilitates simultaneous participation of numerous players, each controlled by an independent agent.
-* **Realistic 2D Physics:** Leverages the Pymunk library to simulate accurate and responsive movement, collisions, and ricochets for all interactive elements within the game.
-* **Intuitive HTTP API:** Offers a straightforward and well-documented interface built with FastAPI, enabling agents to easily send control commands and receive comprehensive game state updates.
-* **Real-time Visualizer:** Provides a dynamic Pygame-based graphical representation of the game arena, allowing for immediate observation of all in-game actions and states.
-* **Distinct Player Entities:** Features uniquely colored, triangular spacecraft for each player, enhancing visual clarity and identification within the arena.
-* **Projectile-Based Combat:** Implements a core combat mechanic where players can launch colored projectiles to engage and damage opponents.
-* **Strategic Obstacles:** Populates the arena with static circular obstacles that serve as both tactical cover and navigational challenges.
-* **Dynamic Arena Boundaries:** Defines the play area with energy field boundaries that cause spacecraft and projectiles to bounce realistically upon contact.
-* **Comprehensive Relative State Information:** Equips agents with detailed sensory data about their immediate surroundings, including the position, velocity, and type of nearby entities.
-* **Pre-Game Readiness System:** Ensures all participating players are prepared before a match begins through a mandatory readiness signaling mechanism.
-* **Initial Spawn Protection:** Grants newly spawned players a temporary period of invulnerability and firing restriction to prevent immediate elimination.
+- **Multiplayer Support:** Host multiple players controlled by independent agents through a unified FastAPI-based HTTP API.
+- **Realistic 2D Physics:** Enjoy responsive and lifelike interactions powered by Pymunk, simulating movement, collisions, and ricochets.
+- **Intuitive and Optimized API:** Easily control your spacecraft with endpoints for movement, rotation, shooting, and state queries. New parameters now capture agent origin to preserve your identity across game sessions.
+- **Real-time Visualizer:** Watch the arena come alive with Pygame’s dynamic graphical interface.
+- **Detailed Statistics & Analysis:** Game statistics such as shots fired, collisions, scores, and precise survival lifetimes are plotted and logged in CSV for ultimate post-match insights.
+- **Strategic Obstacles & Boundaries:** Use static obstacles for tactical cover and navigate dynamic, bouncing boundaries for strategic gameplay.
+- **Pre-Game Readiness & Spawn Protection:** Ensure all players are ready before the game starts. Receive temporary spawn protection for a fair start.
+- **Enhanced Restart Functionality:** Restart the game while retaining connected players and mapping each to their originating agent for continuity in scoring.
 
 ## Architecture
 
 The system consists of three main components:
 
-1.  **Game Server (FastAPI + Pymunk):**
-    *   Located in `src/api/` and `src/core/`.
-    *   Manages the core game loop, physics simulation (`GameWorld`), and object states (`game_objects.py`).
-    *   Exposes an HTTP API (`api_endpoints.py`) for agent interaction.
-    *   Started via `main.py`.
-2.  **Visualizer (Pygame):**
-    *   Integrated within `src/core/game_world.py` (`run_visualizer` method).
-    *   Reads the state directly from the `game_world_instance`.
-    *   Renders the game graphically.
-    *   Launched by `main.py` in the main thread after the server starts.
-3.  **Agent (Client):**
-    *   Example implementation: [`dummy_agent.py`](.\dummy_agent.py).
-    *   Connects to the FastAPI server via HTTP requests (`requests` library).
-    *   Sends control commands (thrust, rotate, shoot) to the API.
-    *   Receives relative game state information from the API.
-    *   Must be run as a separate process *after* `main.py` has started the server.
+1. **Game Server (FastAPI + Pymunk):**
+    - Located in `src/api/` and `src/core/`.
+    - Manages the central game loop, physics simulation, and object interactions.
+    - Exposes a clear and optimized HTTP API for agent interactions (see [API Overview](#api-overview)).
+    - Launched via `main.py`.
+
+2. **Visualizer (Pygame):**
+    - Embedded within `src/core/game_world.py` (using the `run_visualizer` method).
+    - Renders the arena with smooth animations and detailed game statistics.
+    - Runs in the main thread alongside the server.
+
+3. **Agent (Client):**
+    - Example implementations such as [`dummy1.py`](agents/dummy1.py) and [`dummy2.py`](agents/dummy2.py) demonstrate agent behavior.
+    - Agents connect via HTTP, sending movement and action commands and receiving game state updates.
+    - Each agent is now tagged with an origin (agent name) to maintain persistent identity even if a new UUID is assigned upon reconnection.
 
 ## Installation
 
-1.  **Clone the Repository (if you haven't already):**
+1. **Clone the Repository:**
     ```bash
     git clone git@github.com:DaniFabi24/UPC_PyGame.git
     ```
-2.  **Create and Activate a Virtual Environment:**
-    Open your terminal in the project root (where [`requirements.txt`](.\requirements.txt) is located) and run:
+
+2. **Create and Activate a Virtual Environment:**
+    Open your terminal in the project root (where [`requirements.txt`](requirements.txt) is located) and run:
     ```bash
-    # Using python's built-in venv module
     python -m venv venv
-    # Activate the environment
     # On Linux/macOS:
     source venv/bin/activate
-    # On Windows (Command Prompt/PowerShell):
+    # On Windows:
     .\venv\Scripts\activate
     ```
-3.  **Install Dependencies:**
+
+3. **Install Dependencies:**
     With the virtual environment activated, install the required packages:
     ```bash
     pip install -r requirements.txt
@@ -80,107 +79,73 @@ The system consists of three main components:
 
 ## Running the Simulation
 
-You have two main ways to run the simulation: all at once using the `run_game.sh` script, or step by step by manually launching the server and then the agents. 
+You can run the simulation in two ways:
 
-### Running the Simulation (with `run_game.sh`)
+### Running Everything at Once (Using `run_game.sh` or `run_game_windows.bat`)
 
-This script provides a convenient way to start the entire simulation, including the server, visualizer, and all agent scripts found in the `agents/` folder.
-*Note:* You can add your own agent scripts to this folder to participate in the simulation.
-
-1.  **Ensure the script is executable:**
+- **For Linux:**
     ```bash
-    chmod +x run_game.sh
+    chmod +x run_game_linux.sh
+    ./run_game_linux.sh
     ```
-    (You only need to do this once.)
+- **For Windows:**
+    Double-click or run `run_game_windows.bat` in a command prompt.
 
-2.  **Run the game:**
-    ```bash
-    ./run_game.sh
-    ```
-    The script will:
-    - Start the FastAPI server and Pygame visualizer in the background.
-    - Wait a few seconds for the server to initialize.
-    - Automatically detect all Python files in the `agents/` directory.
-    - Start each detected agent as a separate process.
+These scripts will:
+- Start the FastAPI server and Pygame visualizer.
+- Wait for a few seconds to allow the server to initialize.
+- Automatically detect and launch all agents from the `agents/` folder.
 
-3.  **Termination:**
-    The script will wait for the `main.py` process (server and visualizer) to finish before the `run_game.sh` script itself terminates. You can typically close the visualizer window to end the entire simulation.
+### Running Components Individually
 
-### Running the Simulation step by step
-
-If you want more control, you can also start the components manually:
-
-1.  **Start the Server and Visualizer:**
-    Open a terminal in the project root and run:
+1. **Start the Server and Visualizer:**
     ```bash
     python main.py
     ```
-    Wait for the console output indicating the server is running and the visualizer window to appear. The server runs in a background thread initiated by `main.py`, and the visualizer runs in the main thread.
+    Wait for the visualizer window and console logs showing the server status.
 
-2.  **Run Agent(s):**
-    In one or more *separate* terminal windows, run any agent script from the `agents/` directory:
+2. **Start Agent(s) in Separate Terminals:**
     ```bash
-    python agents/agent1.py
-    python agents/agent2.py
+    python agents/dummy1.py
+    python agents/dummy2.py
     ```
-    Each execution will connect a new agent/player to the running game server.
-
-
-## Agent Control (`dummy_agent.py`)
-
-The `dummy_agent.py` script uses a Pygame window to capture key presses and send corresponding actions to the server.
-
-* **Spacebar:** Shoot a projectile.
-* **Arrow Up:** Apply forward thrust.
-* **Arrow Down:** Apply backward thrust (brake/reverse).
-* **Arrow Left:** Rotate the player left.
-* **Arrow Right:** Rotate the player right.
-* **Enter Key:** Request and print the current relative game state from the `/player/{player_id}/scan` endpoint to the agent's console.
-* **Right Shift Key:** Send a "ready" signal to the server (`/player/ready/{player_id}`).
-* **Left Shift Key:** Request and print the current game state from the `/player/{player_id}/game-state` endpoint to the agent's console.
-* **Left Control Key:** Request and print the player's state from the `/player/{player_id}/state` endpoint to the agent's console.
+    Each agent will connect to the running game server.
 
 ## API Overview
 
-The FastAPI server exposes the following key endpoints for agent interaction (base URL defined in [`src/settings.py`](.\src\settings.py)):
+The FastAPI server exposes the following key endpoints (base URL defined in [`src/settings.py`](src/settings.py)):
 
-* `POST /connect`: Connects a new agent, returns a unique `player_id`.
-* `POST /disconnect/{player_id}`: Disconnects the specified player.
-* `GET /player/{player_id}/state`: Retrieves the player's specific state (includes velocity, health, etc.).
-* `GET /player/{player_id}/game-state`: Retrieves the overall state of the game (e.g., other players, obstacles).
-* `GET /player/{player_id}/scan`: Retrieves the game state relative to the specified player (includes nearby objects, velocity, health).
-* `POST /player/{player_id}/thrust_forward`: Applies forward thrust.
-* `POST /player/{player_id}/thrust_backward`: Applies backward thrust.
-* `POST /player/{player_id}/rotate_left`: Applies left rotation torque.
-* `POST /player/{player_id}/rotate_right`: Applies right rotation torque.
-* `POST /player/{player_id}/shoot`: Fires a projectile.
-* `POST /player/ready/{player_id}`: Signals that a player is ready to start a game (potentially for future game modes).
-
-*(Refer to [`src/api/api_endpoints.py`](.\src\api\api_endpoints.py) for implementation details)*
+- **Player Management:**
+  - `POST /connect`: Connects a new agent. The server now records the agent’s origin.
+  - `POST /disconnect/{player_id}`: Disconnects the specified player.
+- **State Retrieval:**
+  - `GET /player/{player_id}/state`: Retrieves your specific state (velocity, health, etc.).
+  - `GET /player/{player_id}/game-state`: Retrieves the overall game state.
+  - `GET /player/{player_id}/scan`: Retrieves nearby objects and relative state information.
+- **Gameplay Actions:**
+  - `POST /player/{player_id}/thrust_forward`: Apply forward thrust.
+  - `POST /player/{player_id}/thrust_backward`: Apply reverse thrust.
+  - `POST /player/{player_id}/rotate_left`: Rotate left.
+  - `POST /player/{player_id}/rotate_right`: Rotate right.
+  - `POST /player/{player_id}/shoot`: Fire a projectile.
+  - `POST /player/ready/{player_id}`: Signal readiness to start the game.
+- **Game Management:**
+  - `POST /game/restart`: Restart the game while preserving connected players and remapping them to their originating agents.
 
 ## Configuration
 
-Key game parameters can be adjusted in [`src/settings.py`](.\src\settings.py), including:
-
-*   API host and port.
-*   Screen dimensions and FPS.
-*   Physics settings (timestep).
-*   Player movement forces, rotation speed, max speed, health, scan radius.
-*   Projectile speed, radius, lifetime, damage.
-
-## Competition Instructions
-
-*   **Objective:** Be the last player surviving in the arena. This is a free-for-all deathmatch.
-*   **Agent Development:** Modify [`dummy_agent.py`](.\dummy_agent.py) or create your own agent script that interacts with the game server via the defined HTTP API.
-*   **Focus:** Your agent should make decisions based on the relative state information received from the `/player/{player_id}/state` endpoint.
-*   **Code Standards:** Ensure your agent code is readable and connects/interacts correctly with the provided server API.
-*   **Evaluation:** Agents will be evaluated based on functionality (correct interaction), performance (efficiency in processing state and reacting), survival time, and potentially strategic innovation (use of environment, aiming).
-*   **Submission:** Submit your agent script (`.py` file) along with a brief description of its strategy.
-
+Adjust key game parameters in [`src/settings.py`](src/settings.py), such as:
+- API host/port.
+- Screen dimensions and FPS.
+- Physics timestep.
+- Player movement forces, rotation speed, maximum speed, and health.
+- Projectile speed, size, lifetime, and damage.
+- Game duration and scoring rules.
 
 ## Contributing
 
-Feel free to report issues or suggest improvements using the templates provided in the `.github` directory:
+Feel free to report issues or suggest improvements using:
+- [Issue Template](.github/ISSUE_TEMPLATE/general_issue.md)
+- [Discussion Template](.github/DISCUSSIONS_TEMPLATE/general_discussion.md)
 
-*   **Issues:** [`general_issue.md`](/.github/ISSUE_TEMPLATE/general_issue.md)
-*   **Discussions:** [`general_discussion.md`](.github/DISCUSSIONS_TEMPLATE/general_discussion.md)
+Happy gaming and coding – welcome to the best simulation ever!
