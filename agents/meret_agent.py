@@ -14,6 +14,7 @@ PLAYER_NAME = "dummy_meret"
 class DummyMeretAgent:
     def __init__(self, player_id=None):
         """Initialize agent with optional player_id (will be set in connect() if None)"""
+        self.connect() #ADDED BY COMPETITION ORGANIZERS
         # Connection and basic state
         self.player_id = player_id  # Can be None initially
         self.game_running = True
@@ -128,16 +129,27 @@ class DummyMeretAgent:
         self.current_waypoint = None
         self.path_needs_update = True  # Flag that path should be recalculated
 
-    def connect(self):
+    def connect(self, agent_name="Marta"):
         """Establish connection to the server"""
         try:
-            resp = requests.post(f"{API_URL}/connect", json={"agent_name": PLAYER_NAME}, timeout=3)
-            self.player_id = resp.json()["player_id"]
-            print(f"Connected as player {self.player_id}")
-            return True
-        except Exception as e:
-            print(f"Connection error: {e}")
-            return False
+                # Teamnummer/Name hier setzen (z.B. "Team1" oder "Bot1")
+                team_name = "Meret"  # Für dummy1.py
+
+                response = requests.post(
+                    f"{API_URL}/connect",
+                    json={"agent_name": team_name}
+                )
+                response.raise_for_status()
+                data = response.json()
+                self.player_id = data.get("player_id")
+                if self.player_id:
+                    print(f"Connected successfully. Player ID: {self.player_id}")
+                else:
+                    print("Error: Could not get Player ID from server.")
+                    sys.exit(1)
+        except requests.exceptions.RequestException as e:
+                print(f"Error connecting to server: {e}")
+                sys.exit(1)
 
     def ready(self):
         """Send ready signal"""
