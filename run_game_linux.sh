@@ -16,7 +16,7 @@ sleep 8
 # List all available agents in the "agents" folder
 AGENTS_DIR="./agents"
 echo "Automatically detecting agents in $AGENTS_DIR..."
-AGENT_FILES=$(ls $AGENTS_DIR/*.py)
+AGENT_FILES=$(find $AGENTS_DIR -maxdepth 1 -name "*.py" ! -name "*Zone.Identifier*" ! -name "__init__.py" ! -name "world_model.py")
 echo "Detected agents:"
 echo "$AGENT_FILES"
 
