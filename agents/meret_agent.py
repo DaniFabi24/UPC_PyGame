@@ -14,7 +14,6 @@ PLAYER_NAME = "dummy_meret"
 class DummyMeretAgent:
     def __init__(self, player_id=None):
         """Initialize agent with optional player_id (will be set in connect() if None)"""
-        self.connect() #ADDED BY COMPETITION ORGANIZERS
         # Connection and basic state
         self.player_id = player_id  # Can be None initially
         self.game_running = True
