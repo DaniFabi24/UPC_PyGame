@@ -50,7 +50,7 @@ class SmartAgent:
         self.safe_paths = []  # Caminhos conhecidos entre obstáculos
         self.last_obstacle_update = 0
 
-    def connect(self, agent_name="smart_agent_safe"):
+    def connect(self, agent_name="marta"):
         try:
             response = requests.post(
                 f"{self.api_base}/connect",
