@@ -3,7 +3,7 @@
 fastapi         # For building the web API
 uvicorn         # ASGI server to run the FastAPI application
 pygame          # For 2D graphics, visualization, and input handling (in agent)
-pymunk          # For the 2D physics engine simulation
+pymunk          # For the 2D physics engine simulation, older version e.g. pymunk==5.7.0 to support add_collision_handler()
 requests        # For making HTTP requests (used by the agent to communicate with the API)
 matplotlib      # For plotting and visualizing data (used by the agent)
 
