@@ -146,6 +146,15 @@ async def get_overall_game_state(player_id: str):
         )
     return state_data
 
+@app.get("/game_status")
+async def game_status():
+    """
+    Returns the current game state for agent startup checks.
+    """
+    # Passe ggf. die Status-Logik an deine GameWorld an!
+    state = "running" if game_world_instance.game_started else "waiting"
+    return {"state": state}
+
 @app.post("/player/ready/{player_id}")
 async def ready_to_play(player_id: str):
     """

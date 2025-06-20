@@ -14,24 +14,22 @@ class Agent:
 
     def connect(self):
         try:
-                # Teamnummer/Name hier setzen (z.B. "Team1" oder "Bot1")
-                team_name = "Haakon"  # Für dummy1.py
-
-                response = requests.post(
-                    f"{API_URL}/connect",
-                    json={"agent_name": team_name}
-                )
-                response.raise_for_status()
-                data = response.json()
-                self.player_id = data.get("player_id")
-                if self.player_id:
-                    print(f"Connected successfully. Player ID: {self.player_id}")
-                else:
-                    print("Error: Could not get Player ID from server.")
-                    sys.exit(1)
-        except requests.exceptions.RequestException as e:
-                print(f"Error connecting to server: {e}")
+            team_name = "Haakon"  # Oder ein anderer eindeutiger Name
+            response = requests.post(
+                f"{API_URL}/connect",
+                json={"agent_name": team_name}
+            )
+            response.raise_for_status()
+            data = response.json()
+            self.player_id = data.get("player_id")
+            if self.player_id:
+                print(f"Connected successfully. Player ID: {self.player_id}")
+            else:
+                print("Error: Could not get Player ID from server.")
                 sys.exit(1)
+        except requests.exceptions.RequestException as e:
+            print(f"Error connecting to server: {e}")
+            sys.exit(1)
             
     def disconnect(self):
         """

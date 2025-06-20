@@ -12,13 +12,13 @@ API_URL = "http://127.0.0.1:8000"
 PLAYER_NAME = "dummy_meret"
 
 class DummyMeretAgent:
-    def __init__(self, player_id=None):
+    def __init__(self, player_id=None, player_name="Meret"):
         """Initialize agent with optional player_id (will be set in connect() if None)"""
         # Connection and basic state
         self.player_id = player_id  # Can be None initially
         self.game_running = True
         self.error_count = 0
-        self.player_name = DummyMeretAgent.__name__
+        self.player_name = player_name
         
         # Game state tracking
         self.game_state = None
@@ -131,9 +131,14 @@ class DummyMeretAgent:
     def connect(self):
         """Establish connection to the server"""
         try:
-            resp = requests.post(f"{API_URL}/connect", json={"agent_name": PLAYER_NAME}, timeout=3)
+            resp = requests.post(
+                f"{API_URL}/connect",
+                json={"agent_name": self.player_name},
+                timeout=3
+            )
+            resp.raise_for_status()
             self.player_id = resp.json()["player_id"]
-            print(f"Connected as player {self.player_id}")
+            print(f"Connected as player {self.player_id} (Name: {self.player_name})")
             return True
         except Exception as e:
             print(f"Connection error: {e}")
@@ -1855,5 +1860,5 @@ class DummyMeretAgent:
             print("Agent system terminated")     
         
 if __name__ == "__main__":
-    agent = DummyMeretAgent()
+    agent = DummyMeretAgent(player_name="Meret")
     agent.run()
